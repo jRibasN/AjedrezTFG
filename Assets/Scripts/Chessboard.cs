@@ -646,7 +646,7 @@ public class ChessBoard : MonoBehaviour
         }
     }
 
-    private bool ContainsValidMove(ref List<Vector2Int> moves, Vector2Int pos){
+    public static bool ContainsValidMove(ref List<Vector2Int> moves, Vector2Int pos){
         for (int i = 0; i < moves.Count; i++)
             if(moves[i].x == pos.x && moves[i].y == pos.y)
                 return true;
@@ -654,6 +654,30 @@ public class ChessBoard : MonoBehaviour
         return false;
             
     }
+
+    public bool IsSquareThreatened(Vector2Int square, int team)
+    {
+        List<Vector2Int> enemyMoves = new List<Vector2Int>();
+
+        // Iterate through all pieces on the board
+        for (int x = 0; x < TILE_COUNT_X; x++)
+        {
+            for (int y = 0; y < TILE_COUNT_Y; y++)
+            {
+                ChessPiece piece = chessPieces[x, y];
+                if (piece != null && piece.team != team)
+                {
+                    // Get all available moves for the enemy piece
+                    List<Vector2Int> pieceMoves = piece.GetAvailableMoves(ref chessPieces, TILE_COUNT_X, TILE_COUNT_Y);
+                    enemyMoves.AddRange(pieceMoves);
+                }
+            }
+        }
+
+        // Check if any enemy move can reach the specified square
+        return ContainsValidMove(ref enemyMoves, square);
+    }
+
     private Vector2Int LookupTileIndex(GameObject hitInfo){
         for (int x = 0; x < TILE_COUNT_X; x++)
             for (int y = 0; y < TILE_COUNT_Y; y++)
@@ -832,6 +856,7 @@ public class ChessBoard : MonoBehaviour
             rematchIndicator.transform.GetChild((rm.wantRematch == 1) ? 0 : 1).gameObject.SetActive(true);
             if(rm.wantRematch != 1){
                 rematchButton.interactable = false;
+                rematchIndicator.transform.GetChild(0).gameObject.SetActive(false);
             }
         }
 

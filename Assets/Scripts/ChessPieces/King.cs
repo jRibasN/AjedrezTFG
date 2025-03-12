@@ -59,6 +59,8 @@ public class King : ChessPiece
         var leftRook = moveList.Find(m => m[0].x == 0 && m[0].y == ((team == 0) ? 0 : 7));
         var rightRook = moveList.Find(m => m[0].x == 7 && m[0].y == ((team == 0) ? 0 : 7));
 
+        ChessBoard chessBoard = FindObjectOfType<ChessBoard>();
+
         if(kingMove == null && currentX == 4){
             // White team
             if(team == 0){
@@ -69,8 +71,12 @@ public class King : ChessPiece
                             if(board[3, 0] == null)
                                 if(board[2, 0] == null)
                                     if(board[1, 0] == null){
-                                        availableMoves.Add(new Vector2Int(2, 0));
-                                        r = SpecialMove.Castling;
+                                        if (!chessBoard.IsSquareThreatened(new Vector2Int(2, 0), team) &&
+                                            !chessBoard.IsSquareThreatened(new Vector2Int(3, 0), team) &&
+                                            !chessBoard.IsSquareThreatened(new Vector2Int(4, 0), team)){
+                                            availableMoves.Add(new Vector2Int(2, 0));
+                                            r = SpecialMove.Castling;
+                                        }
                                     }
 
                 // Right Rook
@@ -79,8 +85,12 @@ public class King : ChessPiece
                         if(board[7, 0].team == 0)
                             if(board[5, 0] == null)
                                 if(board[6, 0] == null){
-                                    availableMoves.Add(new Vector2Int(6, 0));
-                                        r = SpecialMove.Castling;
+                                    if (!chessBoard.IsSquareThreatened(new Vector2Int(6, 0), team) &&
+                                            !chessBoard.IsSquareThreatened(new Vector2Int(5, 0), team) &&
+                                            !chessBoard.IsSquareThreatened(new Vector2Int(4, 0), team)){
+                                            availableMoves.Add(new Vector2Int(6, 0));
+                                            r = SpecialMove.Castling;
+                                        }
                                 }
             }
 
@@ -92,8 +102,12 @@ public class King : ChessPiece
                             if(board[3, 7] == null)
                                 if(board[2, 7] == null)
                                     if(board[1, 7] == null){
-                                        availableMoves.Add(new Vector2Int(2, 7));
-                                        r = SpecialMove.Castling;
+                                        if (!chessBoard.IsSquareThreatened(new Vector2Int(2, 7), team) &&
+                                            !chessBoard.IsSquareThreatened(new Vector2Int(3, 7), team) &&
+                                            !chessBoard.IsSquareThreatened(new Vector2Int(4, 7), team)){
+                                            availableMoves.Add(new Vector2Int(2, 7));
+                                            r = SpecialMove.Castling;
+                                        }
                                     }
 
                 // Right Rook
@@ -102,8 +116,12 @@ public class King : ChessPiece
                         if(board[7, 7].team == 1)
                             if(board[5, 7] == null)
                                 if(board[6, 7] == null){
-                                    availableMoves.Add(new Vector2Int(6, 7));
-                                        r = SpecialMove.Castling;
+                                    if (!chessBoard.IsSquareThreatened(new Vector2Int(6, 7), team) &&
+                                            !chessBoard.IsSquareThreatened(new Vector2Int(5, 7), team) &&
+                                            !chessBoard.IsSquareThreatened(new Vector2Int(4, 7), team)){
+                                            availableMoves.Add(new Vector2Int(6, 7));
+                                            r = SpecialMove.Castling;
+                                        }
                                 }
             }
         }

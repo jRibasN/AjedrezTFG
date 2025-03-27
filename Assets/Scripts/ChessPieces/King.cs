@@ -3,7 +3,13 @@ using UnityEngine;
 
 public class King : ChessPiece
 {
-    public override List<Vector2Int> GetAvailableMoves(ChessPiece[,] board, int tileCountX, int tileCountY){
+    public override List<Vector2Int> GetAvailableMoves(ChessPiece[,] board, int tileCountX, int tileCountY, List<Vector2Int[]> moveList1){
+        var kingMove = moveList1.Find(m => m[0].x == 4 && m[0].y == ((team == 0) ? 0 : 7));
+        var leftRook = moveList1.Find(m => m[0].x == 0 && m[0].y == ((team == 0) ? 0 : 7));
+        var rightRook = moveList1.Find(m => m[0].x == 7 && m[0].y == ((team == 0) ? 0 : 7));
+
+        ChessBoard chessBoard = FindObjectOfType<ChessBoard>();
+
         List<Vector2Int> r = new List<Vector2Int>();
 
         List<Vector2Int> kingPotentialMoves = new List<Vector2Int>();
@@ -48,19 +54,6 @@ public class King : ChessPiece
                 r.Add(move);
         }
 
-        return r;
-    }
-
-    public override SpecialMove GetSpecialMoves(ChessPiece[,] board, List<Vector2Int[]> moveList, ref List<Vector2Int> availableMoves)
-    {
-        SpecialMove r = SpecialMove.None;
-
-        var kingMove = moveList.Find(m => m[0].x == 4 && m[0].y == ((team == 0) ? 0 : 7));
-        var leftRook = moveList.Find(m => m[0].x == 0 && m[0].y == ((team == 0) ? 0 : 7));
-        var rightRook = moveList.Find(m => m[0].x == 7 && m[0].y == ((team == 0) ? 0 : 7));
-
-        ChessBoard chessBoard = FindObjectOfType<ChessBoard>();
-
         if(kingMove == null && currentX == 4){
             // White team
             if(team == 0){
@@ -71,11 +64,10 @@ public class King : ChessPiece
                             if(board[3, 0] == null)
                                 if(board[2, 0] == null)
                                     if(board[1, 0] == null){
-                                        if (!chessBoard.IsSquareThreatened(new Vector2Int(2, 0), team) &&
-                                            !chessBoard.IsSquareThreatened(new Vector2Int(3, 0), team) &&
-                                            !chessBoard.IsSquareThreatened(new Vector2Int(4, 0), team)){
-                                            availableMoves.Add(new Vector2Int(2, 0));
-                                            r = SpecialMove.Castling;
+                                        if (!chessBoard.IsSquareThreatened(new Vector2Int(2, 0), team, moveList1) &&
+                                            !chessBoard.IsSquareThreatened(new Vector2Int(3, 0), team, moveList1) &&
+                                            !chessBoard.IsSquareThreatened(new Vector2Int(4, 0), team, moveList1)){
+                                            r.Add(new Vector2Int(2, 0));
                                         }
                                     }
 
@@ -85,11 +77,10 @@ public class King : ChessPiece
                         if(board[7, 0].team == 0)
                             if(board[5, 0] == null)
                                 if(board[6, 0] == null){
-                                    if (!chessBoard.IsSquareThreatened(new Vector2Int(6, 0), team) &&
-                                            !chessBoard.IsSquareThreatened(new Vector2Int(5, 0), team) &&
-                                            !chessBoard.IsSquareThreatened(new Vector2Int(4, 0), team)){
-                                            availableMoves.Add(new Vector2Int(6, 0));
-                                            r = SpecialMove.Castling;
+                                    if (!chessBoard.IsSquareThreatened(new Vector2Int(6, 0), team, moveList1) &&
+                                            !chessBoard.IsSquareThreatened(new Vector2Int(5, 0), team, moveList1) &&
+                                            !chessBoard.IsSquareThreatened(new Vector2Int(4, 0), team, moveList1)){
+                                            r.Add(new Vector2Int(6, 0));
                                         }
                                 }
             }
@@ -102,11 +93,10 @@ public class King : ChessPiece
                             if(board[3, 7] == null)
                                 if(board[2, 7] == null)
                                     if(board[1, 7] == null){
-                                        if (!chessBoard.IsSquareThreatened(new Vector2Int(2, 7), team) &&
-                                            !chessBoard.IsSquareThreatened(new Vector2Int(3, 7), team) &&
-                                            !chessBoard.IsSquareThreatened(new Vector2Int(4, 7), team)){
-                                            availableMoves.Add(new Vector2Int(2, 7));
-                                            r = SpecialMove.Castling;
+                                        if (!chessBoard.IsSquareThreatened(new Vector2Int(2, 7), team, moveList1) &&
+                                            !chessBoard.IsSquareThreatened(new Vector2Int(3, 7), team, moveList1) &&
+                                            !chessBoard.IsSquareThreatened(new Vector2Int(4, 7), team, moveList1)){
+                                            r.Add(new Vector2Int(2, 7));
                                         }
                                     }
 
@@ -116,11 +106,10 @@ public class King : ChessPiece
                         if(board[7, 7].team == 1)
                             if(board[5, 7] == null)
                                 if(board[6, 7] == null){
-                                    if (!chessBoard.IsSquareThreatened(new Vector2Int(6, 7), team) &&
-                                            !chessBoard.IsSquareThreatened(new Vector2Int(5, 7), team) &&
-                                            !chessBoard.IsSquareThreatened(new Vector2Int(4, 7), team)){
-                                            availableMoves.Add(new Vector2Int(6, 7));
-                                            r = SpecialMove.Castling;
+                                    if (!chessBoard.IsSquareThreatened(new Vector2Int(6, 7), team, moveList1) &&
+                                            !chessBoard.IsSquareThreatened(new Vector2Int(5, 7), team, moveList1) &&
+                                            !chessBoard.IsSquareThreatened(new Vector2Int(4, 7), team, moveList1)){
+                                            r.Add(new Vector2Int(6, 7));
                                         }
                                 }
             }

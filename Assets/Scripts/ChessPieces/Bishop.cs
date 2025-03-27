@@ -3,7 +3,7 @@ using UnityEngine;
 
 public class Bishop : ChessPiece
 {
-    public override List<Vector2Int> GetAvailableMoves(ChessPiece[,] board, int tileCountX, int tileCountY){
+    public override List<Vector2Int> GetAvailableMoves(ChessPiece[,] board, int tileCountX, int tileCountY, List<Vector2Int[]> moveList1){
         List<Vector2Int> r = new List<Vector2Int>();
 
         // Diagonal (+, +)

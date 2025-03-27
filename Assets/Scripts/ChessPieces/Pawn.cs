@@ -3,7 +3,7 @@ using UnityEngine;
 
 public class Pawn : ChessPiece
 {
-    public override List<Vector2Int> GetAvailableMoves(ChessPiece[,] board, int tileCountX, int tileCountY){
+    public override List<Vector2Int> GetAvailableMoves(ChessPiece[,] board, int tileCountX, int tileCountY, List<Vector2Int[]> moveList1){
         List<Vector2Int> r = new List<Vector2Int>();
 
         int direction = (team == 0) ? 1 : -1;
@@ -32,17 +32,6 @@ public class Pawn : ChessPiece
         if (currentX != 0)
             if (board[currentX - 1, currentY + direction] != null &&  board[currentX - 1, currentY + direction].team != team)
                 r.Add(new Vector2Int(currentX - 1, currentY + direction));
-
-        return r;
-    }
-
-    public override SpecialMove GetSpecialMoves(ChessPiece[,] board, List<Vector2Int[]> moveList1, ref List<Vector2Int> availableMoves){
-        
-        int direction = (team == 0) ? 1 : -1;
-
-        // Promotion
-        if((team == 0 && currentY == 6) || (team == 1 && currentY == 1))
-            return SpecialMove.Promotion;
         
         // En Passant
         if (moveList1.Count > 0){
@@ -52,13 +41,11 @@ public class Pawn : ChessPiece
                     if (board[lastMove[1].x, lastMove[1].y].team != team){ // If the move was from the other team
                         if (lastMove[1].y == currentY){ // If both pawns are on the same Y
                             if(lastMove[1].x == currentX - 1){ // Landed left
-                                availableMoves.Add(new Vector2Int(currentX - 1, currentY + direction));
-                                return SpecialMove.EnPassant;
+                                r.Add(new Vector2Int(currentX - 1, currentY + direction));
                             }
 
                             if(lastMove[1].x == currentX + 1){ // Landed right
-                                availableMoves.Add(new Vector2Int(currentX + 1, currentY + direction));
-                                return SpecialMove.EnPassant;
+                                r.Add(new Vector2Int(currentX + 1, currentY + direction));
                             }
                         }
                     }
@@ -66,6 +53,8 @@ public class Pawn : ChessPiece
             }
         }
 
-        return SpecialMove.None;
+        // Promotion handled in ProcessSpecialMove() in ChessBoard.cs
+
+        return r;
     }
 }

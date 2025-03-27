@@ -33,7 +33,7 @@ public class ChessPiece : MonoBehaviour
         transform.localScale = Vector3.Lerp(transform.localScale, desiredScale, Time.deltaTime * 10);
     }
 
-    public virtual List<Vector2Int> GetAvailableMoves(ChessPiece[,] board, int tileCountX, int tileCountY){
+    public virtual List<Vector2Int> GetAvailableMoves(ChessPiece[,] board, int tileCountX, int tileCountY, List<Vector2Int[]> moveList1){
         List<Vector2Int> r = new List<Vector2Int>();
 
         r.Add(new Vector2Int(3, 3));
@@ -42,10 +42,6 @@ public class ChessPiece : MonoBehaviour
         r.Add(new Vector2Int(4, 4));
 
         return r;
-    }
-
-    public virtual SpecialMove GetSpecialMoves(ChessPiece[,] board, List<Vector2Int[]> moveList, ref List<Vector2Int> availableMoves){
-        return SpecialMove.None;
     }
 
     public virtual void SetPosition(Vector3 position, bool force = false){

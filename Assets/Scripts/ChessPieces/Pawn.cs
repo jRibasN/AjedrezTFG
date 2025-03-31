@@ -8,6 +8,9 @@ public class Pawn : ChessPiece
 
         int direction = (team == 0) ? 1 : -1;
 
+        if (currentY == 0 || currentY == tileCountY - 1) // If the pawn is on the first or last row, it can't move
+            return r;
+            
         // One in front
         if (board[currentX, currentY + direction] == null){
                 r.Add(new Vector2Int(currentX, currentY + direction));
@@ -36,16 +39,18 @@ public class Pawn : ChessPiece
         // En Passant
         if (moveList1.Count > 0){
             Vector2Int[] lastMove = moveList1[moveList1.Count - 1];
-            if (board[lastMove[1].x, lastMove[1].y].type == ChessPieceType.Pawn){ // If the last piece moved was a pawn
-                if (Mathf.Abs(lastMove[0].y - lastMove[1].y) == 2){ // If the last move was a +2 in either direction
-                    if (board[lastMove[1].x, lastMove[1].y].team != team){ // If the move was from the other team
-                        if (lastMove[1].y == currentY){ // If both pawns are on the same Y
-                            if(lastMove[1].x == currentX - 1){ // Landed left
-                                r.Add(new Vector2Int(currentX - 1, currentY + direction));
-                            }
+            if (board[lastMove[1].x, lastMove[1].y] != null){
+                if (board[lastMove[1].x, lastMove[1].y].type == ChessPieceType.Pawn){ // If the last piece moved was a pawn
+                    if (Mathf.Abs(lastMove[0].y - lastMove[1].y) == 2){ // If the last move was a +2 in either direction
+                        if (board[lastMove[1].x, lastMove[1].y].team != team){ // If the move was from the other team
+                            if (lastMove[1].y == currentY){ // If both pawns are on the same Y
+                                if(lastMove[1].x == currentX - 1){ // Landed left
+                                    r.Add(new Vector2Int(currentX - 1, currentY + direction));
+                                }
 
-                            if(lastMove[1].x == currentX + 1){ // Landed right
-                                r.Add(new Vector2Int(currentX + 1, currentY + direction));
+                                if(lastMove[1].x == currentX + 1){ // Landed right
+                                    r.Add(new Vector2Int(currentX + 1, currentY + direction));
+                                }
                             }
                         }
                     }

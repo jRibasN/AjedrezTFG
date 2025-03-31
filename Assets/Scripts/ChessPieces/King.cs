@@ -58,28 +58,28 @@ public class King : ChessPiece
             // White team
             if(team == 0){
                 // Left Rook
-                if (leftRook == null)
+                if (leftRook == null && board[0, 0] != null)
                     if(board[0, 0].type == ChessPieceType.Rook)
                         if(board[0, 0].team == 0)
                             if(board[3, 0] == null)
                                 if(board[2, 0] == null)
                                     if(board[1, 0] == null){
-                                        if (!chessBoard.IsSquareThreatened(new Vector2Int(2, 0), team, moveList1) &&
-                                            !chessBoard.IsSquareThreatened(new Vector2Int(3, 0), team, moveList1) &&
-                                            !chessBoard.IsSquareThreatened(new Vector2Int(4, 0), team, moveList1)){
+                                        if (!chessBoard.IsSquareThreatened(new Vector2Int(2, 0), team) &&
+                                            !chessBoard.IsSquareThreatened(new Vector2Int(3, 0), team) &&
+                                            !chessBoard.IsSquareThreatened(new Vector2Int(4, 0), team)){
                                             r.Add(new Vector2Int(2, 0));
                                         }
                                     }
 
                 // Right Rook
-                if (rightRook == null)
+                if (rightRook == null && board[7, 0] != null)
                     if(board[7, 0].type == ChessPieceType.Rook)
                         if(board[7, 0].team == 0)
                             if(board[5, 0] == null)
                                 if(board[6, 0] == null){
-                                    if (!chessBoard.IsSquareThreatened(new Vector2Int(6, 0), team, moveList1) &&
-                                            !chessBoard.IsSquareThreatened(new Vector2Int(5, 0), team, moveList1) &&
-                                            !chessBoard.IsSquareThreatened(new Vector2Int(4, 0), team, moveList1)){
+                                    if (!chessBoard.IsSquareThreatened(new Vector2Int(6, 0), team) &&
+                                            !chessBoard.IsSquareThreatened(new Vector2Int(5, 0), team) &&
+                                            !chessBoard.IsSquareThreatened(new Vector2Int(4, 0), team)){
                                             r.Add(new Vector2Int(6, 0));
                                         }
                                 }
@@ -87,28 +87,28 @@ public class King : ChessPiece
 
             else{
                 // Left Rook
-                if (leftRook == null)
+                if (leftRook == null && board[0, 7] != null)
                     if(board[0, 7].type == ChessPieceType.Rook)
                         if(board[0, 7].team == 1)
                             if(board[3, 7] == null)
                                 if(board[2, 7] == null)
                                     if(board[1, 7] == null){
-                                        if (!chessBoard.IsSquareThreatened(new Vector2Int(2, 7), team, moveList1) &&
-                                            !chessBoard.IsSquareThreatened(new Vector2Int(3, 7), team, moveList1) &&
-                                            !chessBoard.IsSquareThreatened(new Vector2Int(4, 7), team, moveList1)){
+                                        if (!chessBoard.IsSquareThreatened(new Vector2Int(2, 7), team) &&
+                                            !chessBoard.IsSquareThreatened(new Vector2Int(3, 7), team) &&
+                                            !chessBoard.IsSquareThreatened(new Vector2Int(4, 7), team)){
                                             r.Add(new Vector2Int(2, 7));
                                         }
                                     }
 
                 // Right Rook
-                if (rightRook == null)
+                if (rightRook == null && board[7, 7] != null)
                     if(board[7, 7].type == ChessPieceType.Rook)
                         if(board[7, 7].team == 1)
                             if(board[5, 7] == null)
                                 if(board[6, 7] == null){
-                                    if (!chessBoard.IsSquareThreatened(new Vector2Int(6, 7), team, moveList1) &&
-                                            !chessBoard.IsSquareThreatened(new Vector2Int(5, 7), team, moveList1) &&
-                                            !chessBoard.IsSquareThreatened(new Vector2Int(4, 7), team, moveList1)){
+                                    if (!chessBoard.IsSquareThreatened(new Vector2Int(6, 7), team) &&
+                                            !chessBoard.IsSquareThreatened(new Vector2Int(5, 7), team) &&
+                                            !chessBoard.IsSquareThreatened(new Vector2Int(4, 7), team)){
                                             r.Add(new Vector2Int(6, 7));
                                         }
                                 }

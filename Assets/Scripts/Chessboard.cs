@@ -32,6 +32,8 @@ public class ChessBoard : MonoBehaviour
     private List<ChessPiece> deadWhites = new List<ChessPiece>();
     private List<ChessPiece> deadBlacks = new List<ChessPiece>();
     private Stack<ChessPiece> capturedPieces = new Stack<ChessPiece>();
+    private Stack<ChessPiece> promotedPawn = new Stack<ChessPiece>();
+    private HashSet<Vector2Int> simulatedPositions = new HashSet<Vector2Int>();
     private const int TILE_COUNT_X = 8;
     private const int TILE_COUNT_Y = 8;
     private GameObject[,] tiles;
@@ -391,7 +393,7 @@ public class ChessBoard : MonoBehaviour
     }
 
     // SpecialMoves
-    private void ProcessSpecialMove(){
+    private void ProcessSpecialMove(bool simMode){
         promotion = false;
         enPassant = false;
         castle = false;
@@ -441,7 +443,8 @@ public class ChessBoard : MonoBehaviour
             if (myPawn.team == 0 && newMove[1].y == 7){
                 ChessPiece newQueen = SpawnSinglePiece(ChessPieceType.Queen, 0, 9);
                 newQueen.transform.position = chessPieces[newMove[1].x, newMove[1].y].transform.position;
-                Destroy(chessPieces[newMove[1].x, newMove[1].y].gameObject);
+                if(simMode) promotedPawn.Push(chessPieces[newMove[1].x, newMove[1].y]);
+                else Destroy(chessPieces[newMove[1].x, newMove[1].y].gameObject);
                 chessPieces[newMove[1].x, newMove[1].y] = newQueen;
                 PositionSinglePiece(newMove[1].x, newMove[1].y);
                 promotion = true;
@@ -450,7 +453,8 @@ public class ChessBoard : MonoBehaviour
             if (myPawn.team == 1 && newMove[1].y == 0){
                 ChessPiece newQueen = SpawnSinglePiece(ChessPieceType.Queen, 1, 9);
                 newQueen.transform.position = chessPieces[newMove[1].x, newMove[1].y].transform.position;
-                Destroy(chessPieces[newMove[1].x, newMove[1].y].gameObject);
+                if(simMode) promotedPawn.Push(chessPieces[newMove[1].x, newMove[1].y]);
+                else Destroy(chessPieces[newMove[1].x, newMove[1].y].gameObject);
                 chessPieces[newMove[1].x, newMove[1].y] = newQueen;
                 PositionSinglePiece(newMove[1].x, newMove[1].y);
                 promotion = true;
@@ -524,6 +528,9 @@ public class ChessBoard : MonoBehaviour
             int  simX = moves[i].x;
             int  simY = moves[i].y;
 
+            if (simulatedPositions.Contains(new Vector2Int(simX, simY)))
+                return;
+
             Vector2Int kingPositionThisSim = new Vector2Int(targetKing.currentX, targetKing.currentY);
             // Did we simulate the king´s move
             if (cp.type == ChessPieceType.King)
@@ -574,6 +581,7 @@ public class ChessBoard : MonoBehaviour
                 cp.currentX = actualX;
                 cp.currentY = actualY;
             }
+            simulatedPositions.Add(new Vector2Int(simX, simY));
         }
 
         // Remove from the current available move list
@@ -581,6 +589,7 @@ public class ChessBoard : MonoBehaviour
         {
             moves.Remove(movesToRemove[i]);
         }
+        simulatedPositions.Clear();
     }
 
     private bool CheckForCheckmate(){
@@ -730,7 +739,7 @@ public class ChessBoard : MonoBehaviour
         bool isWhiteTurnCopy = isWhiteTurn;
 
         if (depth == 0){
-            if(CheckForCheckmate()) return (isWhiteTurnCopy) ? -1000 : 1000;
+            if(CheckForCheckmate()) return isWhiteTurnCopy ? -1000 : 1000;
             return EvaluatePosition();
         }
 
@@ -913,7 +922,7 @@ public class ChessBoard : MonoBehaviour
         if (localGame) currentTeam = (currentTeam == 0) ? 1 : 0;
         moveList.Add(new Vector2Int[] { previousPosition, new Vector2Int(x, y) });
 
-        ProcessSpecialMove();
+        ProcessSpecialMove(simMode);
 
         if (CurrentlyDragging)
             CurrentlyDragging = null;
@@ -987,8 +996,7 @@ public class ChessBoard : MonoBehaviour
         chessPieces[originalX, originalY] = cp;
 
         if(promotionInstance){
-            ChessPiece pawn = SpawnSinglePiece(ChessPieceType.Pawn, 0, 1);
-            pawn.transform.position = cp.transform.position;
+            ChessPiece pawn = promotedPawn.Pop();
             Destroy(cp.gameObject);
             chessPieces[originalX, originalY] = pawn;
         }

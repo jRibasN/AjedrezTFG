@@ -639,6 +639,53 @@ public class ChessBoard : MonoBehaviour
 
                     return true; // Checkmate exit
                 }
+                else{
+                    List<Vector2Int> defendingMoves = new List<Vector2Int>();
+                    foreach (ChessPiece piece in defendingPieces)
+                    {
+                        defendingMoves.AddRange(piece.GetAvailableMoves(chessPieces, TILE_COUNT_X, TILE_COUNT_Y, moveList));
+
+                        if(defendingMoves.Count == 0)
+                            return false;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    private bool CheckForStalemate(){
+        var lastMove = moveList[moveList.Count - 1];
+        if (chessPieces[lastMove[1].x, lastMove[1].y] != null){
+            int targetTeam = (chessPieces[lastMove[1].x, lastMove[1].y].team == 0) ? 1 : 0;
+
+            List<ChessPiece> attackingPieces = new List<ChessPiece>();
+            List<ChessPiece> defendingPieces = new List<ChessPiece>();
+            List<Vector2Int> defendingMoves = new List<Vector2Int>();
+            ChessPiece targetKing = null;
+            for (int x = 0; x < TILE_COUNT_X; x++)
+                for (int y = 0; y < TILE_COUNT_Y; y++)
+                    if (chessPieces[x, y] != null){
+                        if(chessPieces[x, y].team == targetTeam){
+                            defendingPieces.Add(chessPieces[x, y]);
+                            if(chessPieces[x, y].type == ChessPieceType.King)
+                                targetKing = chessPieces[x, y];
+                        }
+                        else{
+                            attackingPieces.Add(chessPieces[x, y]);
+                        }
+                    }
+
+            foreach(ChessPiece piece in defendingPieces){
+                List<Vector2Int> pieceMoves = piece.GetAvailableMoves(chessPieces, TILE_COUNT_X, TILE_COUNT_Y, moveList);
+                PreventCheck(targetTeam, piece, ref pieceMoves);
+
+                defendingMoves.AddRange(pieceMoves);
+            }
+            
+            if(defendingMoves.Count == 0 && !IsSquareThreatened(new Vector2Int(targetKing.currentX, targetKing.currentY), targetTeam)){
+                return true;
+
             }
         }
         return false;
@@ -931,6 +978,9 @@ public class ChessBoard : MonoBehaviour
 
         if (CheckForCheckmate() && !simMode)
             Checkmate(cp.team);
+
+        if (CheckForStalemate() && !simMode)
+            Checkmate(2);
 
         return;
     }

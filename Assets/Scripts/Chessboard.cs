@@ -45,6 +45,7 @@ public class ChessBoard : MonoBehaviour
     private bool enPassant;
     private bool castle;
     private bool capture;
+    private bool isComputerTurnInProgress = false;
     private List<Vector2Int[]> moveList = new List<Vector2Int[]>();
 
     // Multiplayer logic
@@ -163,9 +164,20 @@ public class ChessBoard : MonoBehaviour
         if (computerGame){
             if ((!isWhiteTurn && currentTeam == 0) || (isWhiteTurn && currentTeam == 1)){
                 //SelectRandomMove();
-                ComputerV1(2);
+                if (!isComputerTurnInProgress) // Verifica si el turno ya está en progreso
+                {
+                    isComputerTurnInProgress = true; // Marca el turno como en progreso
+                    StartCoroutine(ExecuteComputerMove());
+                }
             }
         }
+    }
+
+    private IEnumerator ExecuteComputerMove()
+    {
+        yield return new WaitForSeconds(0.5f); // Espera 1 segundo
+        ComputerV1(2); // Llama al método después del retraso
+        isComputerTurnInProgress = false;
     }
 
     //Generate the board
@@ -730,6 +742,9 @@ public class ChessBoard : MonoBehaviour
         Vector2Int bestMove = Vector2Int.zero;
         int iterations = 0;
 
+        float alpha = int.MinValue;
+        float beta = int.MaxValue;
+
         // Iterar a través de todas las piezas del equipo del ordenador
         for (int x = 0; x < TILE_COUNT_X; x++)
         {
@@ -741,6 +756,8 @@ public class ChessBoard : MonoBehaviour
                     List<Vector2Int> pieceMoves = piece.GetAvailableMoves(chessPieces, TILE_COUNT_X, TILE_COUNT_Y, moveList);
                     PreventCheck((currentTeam == 0) ? 1 : 0, piece, ref pieceMoves);
 
+                    pieceMoves = OrderMoves(piece, pieceMoves);
+
                     // Evaluar cada movimiento
                     foreach (Vector2Int move in pieceMoves)
                     {
@@ -750,7 +767,7 @@ public class ChessBoard : MonoBehaviour
                         bool promotionInstance = promotion;
                         bool enPassantInstance = enPassant;
                         bool castleInstance = castle;
-                        float moveValue = Minimax(depth - 1, (currentTeam == 0) ? true : false, ref iterations);
+                        float moveValue = Minimax(depth - 1, alpha, beta, (currentTeam == 0) ? true : false, ref iterations);
                         UndoMove(x, y, move.x, move.y, captureInstance, promotionInstance, enPassantInstance, castleInstance);
 
                         if (currentTeam == 0){
@@ -760,6 +777,7 @@ public class ChessBoard : MonoBehaviour
                                 bestPiece = piece;
                                 bestMove = move;
                             }
+                            beta = Math.Min(beta, moveValue);
                         }
 
                         else{
@@ -768,7 +786,13 @@ public class ChessBoard : MonoBehaviour
                                 bestValueWhite = moveValue;
                                 bestPiece = piece;
                                 bestMove = move;
-                            }    
+                            }   
+                            alpha = Math.Max(alpha, moveValue);
+                        }
+                        // Poda alfa-beta
+                        if (beta <= alpha)
+                        {
+                            break;
                         }
                     }
                 }
@@ -782,7 +806,7 @@ public class ChessBoard : MonoBehaviour
         }
     }
 
-    public float Minimax(int depth, bool isMaximizingPlayer, ref int iterations){
+    public float Minimax(int depth, float alpha, float beta, bool isMaximizingPlayer, ref int iterations){
         bool isWhiteTurnCopy = isWhiteTurn;
 
         if (depth == 0){
@@ -803,6 +827,8 @@ public class ChessBoard : MonoBehaviour
                         List<Vector2Int> pieceMoves2 = piece.GetAvailableMoves(chessPieces, TILE_COUNT_X, TILE_COUNT_Y, moveList);
                         PreventCheck(0, piece, ref pieceMoves2);
 
+                        pieceMoves2 = OrderMoves(piece, pieceMoves2);
+
                         // Evaluar cada movimiento
                         foreach (Vector2Int move in pieceMoves2)
                         {
@@ -812,10 +838,13 @@ public class ChessBoard : MonoBehaviour
                             bool enPassantInstance = enPassant;
                             bool castleInstance = castle;
                             iterations++;
-                            float eval = Minimax(depth - 1, false, ref iterations);
+                            float eval = Minimax(depth - 1, alpha, beta, false, ref iterations);
                             UndoMove(x, y, move.x, move.y, captureInstance, promotionInstance, enPassantInstance, castleInstance); 
+                           
                             //Debug.Log("Eval: " + eval);   
                             maxEval = Math.Max(maxEval, eval);
+                            alpha = Math.Max(alpha, eval);
+                            if (beta <= alpha) break; // Beta cut-off
                         }
                     }
                 }
@@ -838,6 +867,8 @@ public class ChessBoard : MonoBehaviour
                         List<Vector2Int> pieceMoves2 = piece.GetAvailableMoves(chessPieces, TILE_COUNT_X, TILE_COUNT_Y, moveList);
                         PreventCheck(1, piece, ref pieceMoves2);
 
+                        pieceMoves2 = OrderMoves(piece, pieceMoves2);
+
                         // Evaluar cada movimiento
                         foreach (Vector2Int move in pieceMoves2)
                         {
@@ -847,9 +878,12 @@ public class ChessBoard : MonoBehaviour
                             bool promotionInstance = promotion;
                             bool enPassantInstance = enPassant;
                             bool castleInstance = castle;
-                            float eval = Minimax(depth - 1, true, ref iterations);
+                            float eval = Minimax(depth - 1, alpha, beta, true, ref iterations);
                             UndoMove(x, y, move.x, move.y, captureInstance, promotionInstance, enPassantInstance, castleInstance);
+                            
                             minEval = Math.Min(minEval, eval);
+                            beta = Math.Min(beta, eval);
+                            if (beta <= alpha) break; // Alpha cut-off
                         }
                     }
                 }
@@ -932,6 +966,22 @@ public class ChessBoard : MonoBehaviour
                     return new Vector2Int(x, y);
                 
         return -Vector2Int.one; //Invalid
+    }
+
+    private List<Vector2Int> OrderMoves(ChessPiece piece, List<Vector2Int> moves)
+    {
+        moves.Sort((move1, move2) =>
+        {
+            ChessPiece target1 = chessPieces[move1.x, move1.y];
+            ChessPiece target2 = chessPieces[move2.x, move2.y];
+
+            float value1 = (target1 != null) ? target1.value : 0;
+            float value2 = (target2 != null) ? target2.value : 0;
+
+            return value2.CompareTo(value1); // Orden descendente por valor
+        });
+
+        return moves;
     }
 
     private void MoveTo(int originalX, int originalY, int x, int y, bool simMode = false)

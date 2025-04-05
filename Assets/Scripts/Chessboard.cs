@@ -724,8 +724,8 @@ public class ChessBoard : MonoBehaviour
     }
 
     public void ComputerV1(int depth){
-        int bestValueWhite = int.MinValue;
-        int bestValueBlack = int.MaxValue;
+        float bestValueWhite = int.MinValue;
+        float bestValueBlack = int.MaxValue;
         ChessPiece bestPiece = null;
         Vector2Int bestMove = Vector2Int.zero;
         int iterations = 0;
@@ -750,7 +750,7 @@ public class ChessBoard : MonoBehaviour
                         bool promotionInstance = promotion;
                         bool enPassantInstance = enPassant;
                         bool castleInstance = castle;
-                        int moveValue = Minimax(depth - 1, (currentTeam == 0) ? true : false, ref iterations);
+                        float moveValue = Minimax(depth - 1, (currentTeam == 0) ? true : false, ref iterations);
                         UndoMove(x, y, move.x, move.y, captureInstance, promotionInstance, enPassantInstance, castleInstance);
 
                         if (currentTeam == 0){
@@ -782,7 +782,7 @@ public class ChessBoard : MonoBehaviour
         }
     }
 
-    public int Minimax(int depth, bool isMaximizingPlayer, ref int iterations){
+    public float Minimax(int depth, bool isMaximizingPlayer, ref int iterations){
         bool isWhiteTurnCopy = isWhiteTurn;
 
         if (depth == 0){
@@ -791,7 +791,7 @@ public class ChessBoard : MonoBehaviour
         }
 
         if (isMaximizingPlayer){
-            int maxEval = int.MinValue;
+            float maxEval = float.MinValue;
 
             for (int x = 0; x < TILE_COUNT_X; x++)
             {
@@ -812,7 +812,7 @@ public class ChessBoard : MonoBehaviour
                             bool enPassantInstance = enPassant;
                             bool castleInstance = castle;
                             iterations++;
-                            int eval = Minimax(depth - 1, false, ref iterations);
+                            float eval = Minimax(depth - 1, false, ref iterations);
                             UndoMove(x, y, move.x, move.y, captureInstance, promotionInstance, enPassantInstance, castleInstance); 
                             //Debug.Log("Eval: " + eval);   
                             maxEval = Math.Max(maxEval, eval);
@@ -826,7 +826,7 @@ public class ChessBoard : MonoBehaviour
         }
 
         else{
-            int minEval = int.MaxValue;
+            float minEval = float.MaxValue;
 
             for (int x = 0; x < TILE_COUNT_X; x++)
             {
@@ -847,7 +847,7 @@ public class ChessBoard : MonoBehaviour
                             bool promotionInstance = promotion;
                             bool enPassantInstance = enPassant;
                             bool castleInstance = castle;
-                            int eval = Minimax(depth - 1, true, ref iterations);
+                            float eval = Minimax(depth - 1, true, ref iterations);
                             UndoMove(x, y, move.x, move.y, captureInstance, promotionInstance, enPassantInstance, castleInstance);
                             minEval = Math.Min(minEval, eval);
                         }
@@ -859,17 +859,29 @@ public class ChessBoard : MonoBehaviour
         }
     }
 
-    public int EvaluatePosition(){
-        int whiteValue = 0;
-        int blackValue = 0;
+    public float EvaluateOpponentStrength(int team){
+        float value = 0;
+        for (int x = 0; x < TILE_COUNT_X; x++){
+            for (int y = 0; y < TILE_COUNT_Y; y++){
+                if (chessPieces[x, y] != null && chessPieces[x, y].team != team){
+                    value += chessPieces[x, y].value;
+                }
+            }
+        }
+        return value;
+    }
+
+    public float EvaluatePosition(){
+        float whiteValue = 0;
+        float blackValue = 0;
 
         for (int x = 0; x < TILE_COUNT_X; x++){
             for (int y = 0; y < TILE_COUNT_Y; y++){
                 if (chessPieces[x, y] != null){
                     if (chessPieces[x, y].team == 0)
-                        whiteValue += chessPieces[x, y].value;
+                        whiteValue += chessPieces[x, y].UpdateValue((EvaluateOpponentStrength(chessPieces[x, y].team) < 1015.5f) ? true : false);
                     else
-                        blackValue += chessPieces[x, y].value;
+                        blackValue += chessPieces[x, y].UpdateValue((EvaluateOpponentStrength(chessPieces[x, y].team) < 1015.5f) ? true : false);
                 }
             }
         }
@@ -886,11 +898,15 @@ public class ChessBoard : MonoBehaviour
             
     }
 
+    private bool isCheckingThreat = false;
     public bool IsSquareThreatened(Vector2Int square, int team)
     {
+        if (isCheckingThreat) return false; // Evitar recursión
+        isCheckingThreat = true;
+
         List<Vector2Int> enemyMoves = new List<Vector2Int>();
 
-        // Iterate through all pieces on the board
+        // Iterar sobre todas las piezas enemigas
         for (int x = 0; x < TILE_COUNT_X; x++)
         {
             for (int y = 0; y < TILE_COUNT_Y; y++)
@@ -905,7 +921,7 @@ public class ChessBoard : MonoBehaviour
             }
         }
 
-        // Check if any enemy move can reach the specified square
+        isCheckingThreat = false;
         return ContainsValidMove(ref enemyMoves, square);
     }
 

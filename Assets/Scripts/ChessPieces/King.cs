@@ -3,10 +3,81 @@ using UnityEngine;
 
 public class King : ChessPiece
 {
-    public override List<Vector2Int> GetAvailableMoves(ChessPiece[,] board, int tileCountX, int tileCountY, List<Vector2Int[]> moveList1){
-        var kingMove = moveList1.Find(m => m[0].x == 4 && m[0].y == ((team == 0) ? 0 : 7));
-        var leftRook = moveList1.Find(m => m[0].x == 0 && m[0].y == ((team == 0) ? 0 : 7));
-        var rightRook = moveList1.Find(m => m[0].x == 7 && m[0].y == ((team == 0) ? 0 : 7));
+    List<Vector2Int> excellentSquareWhiteMidgame = new List<Vector2Int>(){b1, g1};
+    List<Vector2Int> goodSquareWhiteMidgame = new List<Vector2Int>(){a1, h1};
+    List<Vector2Int> averageSquareWhiteMidgame = new List<Vector2Int>(){c1, d1, e1, f1};
+    List<Vector2Int> badSquareWhiteMidgame = new List<Vector2Int>(){a2, b2, c2, d2, e2, f2, g2, h2};
+    List<Vector2Int> excellentSquareBlackMidgame = new List<Vector2Int>(){b8, g8};
+    List<Vector2Int> goodSquareBlackMidgame = new List<Vector2Int>(){a8, h8};
+    List<Vector2Int> averageSquareBlackMidgame = new List<Vector2Int>(){c8, d8, e8, f8};
+    List<Vector2Int> badSquareBlackMidgame = new List<Vector2Int>(){a7, b7, c7, d7, e7, f7, g7, h7};
+
+    List<Vector2Int> excellentSquareWhiteEndgame = new List<Vector2Int>(){d4, d5, e4, e5};
+    List<Vector2Int> goodSquareWhiteEndgame = new List<Vector2Int>(){c3, c4, c5 ,c6, d3, d6, e3, e6, f3, f4, f5, f6};
+    List<Vector2Int> averageSquareWhiteEndgame = new List<Vector2Int>(){b3, b4, b5, b6, b7, c7, d7, e7, f7, g3, g4, g5, g6, g7};
+    List<Vector2Int> badSquareWhiteEndgame = new List<Vector2Int>(){b2, c2, d2, e2, f2, g2, b8, c8, d8, e8, f8, g8};
+    List<Vector2Int> excellentSquareBlackEndgame = new List<Vector2Int>(){d4, d5, e4, e5};
+    List<Vector2Int> goodSquareBlackEndgame = new List<Vector2Int>(){c3, c4, c5 ,c6, d3, d6, e3, e6, f3, f4, f5, f6};
+    List<Vector2Int> averageSquareBlackEndgame = new List<Vector2Int>(){b3, b4, b5, b6, b2, c2, d2, e2, f2, g3, g4, g5, g6, g2};
+    List<Vector2Int> badSquareBlackEndgame = new List<Vector2Int>(){b7, c7, d7, e7, f7, g7, b1, c1, d1, e1, f1, g1};
+
+    public override float UpdateValue(bool isEndgame)
+    {
+        Vector2Int square = new Vector2Int(currentX, currentY);
+
+        if(isEndgame){
+            if(team == 0){
+            if (excellentSquareWhiteEndgame.Contains(square))
+                value = 1001f;
+            else if (goodSquareWhiteEndgame.Contains(square))
+                value = 1000.75f;
+            else if (averageSquareWhiteEndgame.Contains(square))
+                value = 1000.5f;
+            else if (badSquareWhiteEndgame.Contains(square))
+                value = 1000.25f;
+            }
+            else {
+                if (excellentSquareBlackEndgame.Contains(square))
+                    value = 1001f;
+                else if (goodSquareBlackEndgame.Contains(square))
+                    value = 1000.75f;
+                else if (averageSquareBlackEndgame.Contains(square))
+                    value = 1000.5f;
+                else if (badSquareBlackEndgame.Contains(square))
+                    value = 1000.25f;
+            }        
+        }
+        else{
+            if(team == 0){
+            if (excellentSquareWhiteMidgame.Contains(square))
+                value = 1001f;
+            else if (goodSquareWhiteMidgame.Contains(square))
+                value = 1000.75f;
+            else if (averageSquareWhiteMidgame.Contains(square))
+                value = 1000.5f;
+            else if (badSquareWhiteMidgame.Contains(square))
+                value = 1000.25f;
+            }
+            else {
+                if (excellentSquareBlackMidgame.Contains(square))
+                    value = 1001f;
+                else if (goodSquareBlackMidgame.Contains(square))
+                    value = 1000.75f;
+                else if (averageSquareBlackMidgame.Contains(square))
+                    value = 1000.5f;
+                else if (badSquareBlackMidgame.Contains(square))
+                    value = 1000.25f;
+            }        
+        }
+
+        
+
+        return value;
+    }
+    public override List<Vector2Int> GetAvailableMoves(ChessPiece[,] board, int tileCountX, int tileCountY, List<Vector2Int[]> moveList){
+        var kingMove = moveList.Find(m => m[0].x == 4 && m[0].y == ((team == 0) ? 0 : 7));
+        var leftRook = moveList.Find(m => m[0].x == 0 && m[0].y == ((team == 0) ? 0 : 7));
+        var rightRook = moveList.Find(m => m[0].x == 7 && m[0].y == ((team == 0) ? 0 : 7));
 
         ChessBoard chessBoard = FindObjectOfType<ChessBoard>();
 

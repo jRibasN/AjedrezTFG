@@ -36,7 +36,6 @@ public class Pawn : ChessPiece
             else if (horribleSquareBlack.Contains(square))
                 value = 0.5f;
         }        
-
         return value;
     }
 

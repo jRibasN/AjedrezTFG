@@ -47,6 +47,7 @@ public class ChessBoard : MonoBehaviour
     private bool castle;
     private bool capture;
     private bool isComputerTurnInProgress = false;
+    private bool waitingAsyncMove = false;
     private Dictionary<string, float> transpositionTable = new Dictionary<string, float>();
     private List<Vector2Int[]> moveList = new List<Vector2Int[]>();
 
@@ -55,7 +56,10 @@ public class ChessBoard : MonoBehaviour
     private int currentTeam = -1;
     private bool localGame = false;
     private bool computerGame = false;
+    private bool asyncGame = true;
     private bool[] playerRematch = new bool[2];
+    private  Vector2Int[] myAsyncMove = {new Vector2Int(-1, -1), new Vector2Int(-1, -1)};
+    private  Vector2Int[] enemyAsyncMove = {new Vector2Int(-1, -1), new Vector2Int(-1, -1)};
     
     private void Start() {
         GenerateAllTiles(tileSize, TILE_COUNT_X, TILE_COUNT_Y);
@@ -100,10 +104,10 @@ public class ChessBoard : MonoBehaviour
 
             // If we press down on the mouse
             if (Input.GetMouseButtonDown(0)){
-                if (chessPieces[hitPosition.x, hitPosition.y] != null){
+                if (chessPieces[hitPosition.x, hitPosition.y] != null && !waitingAsyncMove){
                     // Is it our turn?
-                    if ((chessPieces[hitPosition.x, hitPosition.y].team == 0 && isWhiteTurn && currentTeam == 0) || 
-                        (chessPieces[hitPosition.x, hitPosition.y].team == 1 && !isWhiteTurn && currentTeam == 1)){
+                    if ((chessPieces[hitPosition.x, hitPosition.y].team == 0 && asyncGame ? true : isWhiteTurn && currentTeam == 0) || 
+                        (chessPieces[hitPosition.x, hitPosition.y].team == 1 && asyncGame ? true : !isWhiteTurn && currentTeam == 1)){
                         CurrentlyDragging = chessPieces[hitPosition.x, hitPosition.y];
 
                         // Get a list of where I can go, highlight tiles as well
@@ -120,8 +124,6 @@ public class ChessBoard : MonoBehaviour
                 Vector2Int previousPosition = new Vector2Int(CurrentlyDragging.currentX, CurrentlyDragging.currentY);
 
                 if(ContainsValidMove(ref availableMoves, new Vector2Int(hitPosition.x, hitPosition.y))){
-                    MoveTo(previousPosition.x, previousPosition.y, hitPosition.x, hitPosition.y);
-
                     // Net implementation
                     NetMakeMove mm = new NetMakeMove();
                     mm.originalX = previousPosition.x;
@@ -130,6 +132,14 @@ public class ChessBoard : MonoBehaviour
                     mm.destinationY = hitPosition.y;
                     mm.teamId = currentTeam;
                     Client.Instance.SendToServer(mm);
+
+                    if(asyncGame){
+                        CurrentlyDragging.SetPosition(GetTileCenter(CurrentlyDragging.currentX, CurrentlyDragging.currentY));
+                        CurrentlyDragging = null;
+                        RemoveHighlightTiles();
+                    }
+                    
+                    MoveTo(previousPosition.x, previousPosition.y, hitPosition.x, hitPosition.y);
                 }
 
                 else{
@@ -748,7 +758,6 @@ public class ChessBoard : MonoBehaviour
     }
 
     public void ComputerV1(int depth){
-
         float bestValueWhite = int.MinValue;
         float bestValueBlack = int.MaxValue;
         ChessPiece bestPiece = null;
@@ -1014,6 +1023,16 @@ public class ChessBoard : MonoBehaviour
     {
         if (board == null) board = this.chessPieces;
 
+        if(asyncGame && myAsyncMove[1] == new Vector2Int(-1, -1)){
+            waitingAsyncMove = true;
+            myAsyncMove[0].x = originalX;
+            myAsyncMove[0].y = originalY;
+            myAsyncMove[1].x = x;
+            myAsyncMove[1].y = y;
+            AsyncMove();
+            return;
+        }
+
         // Debug.Log("Moving from " + originalX + ", " + originalY + " to " + x + ", " + y);
         ChessPiece cp = board[originalX, originalY];
         Vector2Int previousPosition = new Vector2Int(originalX, originalY);
@@ -1163,6 +1182,64 @@ public class ChessBoard : MonoBehaviour
         moveList.RemoveAt(moveList.Count - 1);
     }
 
+    private void AsyncMove()
+    {
+        if (enemyAsyncMove[1] != new Vector2Int(-1, -1))
+        {
+            if (myAsyncMove[1] != new Vector2Int(-1, -1))
+            {
+                if (myAsyncMove[1] == enemyAsyncMove[1])
+                {
+                    Debug.Log("Conflict detected: Both players moved to the same tile.");
+                    // Ambos jugadores intentan mover a la misma casilla
+                    ResolveConflict(myAsyncMove, enemyAsyncMove);
+                }
+                else
+                {
+                    // Movimientos simultáneos sin conflicto
+                    MoveTo(myAsyncMove[0].x, myAsyncMove[0].y, myAsyncMove[1].x, myAsyncMove[1].y);
+                    MoveTo(enemyAsyncMove[0].x, enemyAsyncMove[0].y, enemyAsyncMove[1].x, enemyAsyncMove[1].y);
+                }
+
+                // Reiniciar los movimientos asíncronos
+                ResetAsyncMoves();
+            }
+        }
+        else
+        {
+            //Debug.Log("sigue en el else después de enviar el movimiento");
+        }
+        //Debug.Log("sale del else");
+        //Debug.Log($"{(currentTeam == 0 ? "White" : "Black")} move: {myAsyncMove[1]} vs {enemyAsyncMove[1]}");
+    }
+
+    private void ResolveConflict(Vector2Int[] myMove, Vector2Int[] enemyMove)
+    {
+        // Resolver conflicto: Prioridad al jugador cuyo turno es
+        if ((isWhiteTurn && currentTeam == 0) || (!isWhiteTurn && currentTeam == 1))
+        {
+            // Mi movimiento tiene prioridad
+            MoveTo(myMove[0].x, myMove[0].y, myMove[1].x, myMove[1].y);
+        }
+        else
+        {
+            // El movimiento del oponente tiene prioridad
+            MoveTo(enemyMove[0].x, enemyMove[0].y, enemyMove[1].x, enemyMove[1].y);
+        }
+
+        // Restaurar la pieza perdedora a su posición original
+        Debug.Log("Conflict resolved: Priority given to " + (isWhiteTurn ? "White" : "Black"));
+    }
+
+    private void ResetAsyncMoves()
+    {
+        myAsyncMove[0] = new Vector2Int(-1, -1);
+        myAsyncMove[1] = new Vector2Int(-1, -1);
+        enemyAsyncMove[0] = new Vector2Int(-1, -1);
+        enemyAsyncMove[1] = new Vector2Int(-1, -1);
+        waitingAsyncMove = false;
+    }
+
     #region
     private void RegisterEvents(){
         NetUtility.S_WELCOME += OnWelcomeServer;
@@ -1247,18 +1324,22 @@ public class ChessBoard : MonoBehaviour
 
     private void OnMakeMoveClient(NetMessage message)
     {
+        Debug.Log("Received move from server");
         NetMakeMove mm = message as NetMakeMove;
 
         Debug.Log($"MM : {mm.teamId} : {mm.originalX} {mm.originalY} -> {mm.destinationX} {mm.destinationY}");
 
-        if(mm.teamId != currentTeam){
-            ChessPiece target = chessPieces[mm.originalX, mm.originalY];
-
-            availableMoves = target.GetAvailableMoves(chessPieces, TILE_COUNT_X, TILE_COUNT_Y, moveList);
-
-
+        if(mm.teamId != currentTeam && !asyncGame){
             MoveTo(mm.originalX, mm.originalY, mm.destinationX, mm.destinationY);
         }
+        if(asyncGame){
+            if(mm.teamId != currentTeam){
+                enemyAsyncMove[0] = new Vector2Int(mm.originalX, mm.originalY);
+                enemyAsyncMove[1] = new Vector2Int(mm.destinationX, mm.destinationY);
+            }
+            AsyncMove();
+        }
+        
     }
 
     private void OnRematchClient(NetMessage message)

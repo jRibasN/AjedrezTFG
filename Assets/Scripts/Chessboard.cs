@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Data;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Unity.Mathematics;
@@ -46,6 +47,7 @@ public class ChessBoard : MonoBehaviour
     private bool enPassant;
     private bool castle;
     private bool capture;
+    private int winnerTeam = -1;
     private bool isComputerTurnInProgress = false;
     private bool waitingAsyncMove = false;
     private Dictionary<string, float> transpositionTable = new Dictionary<string, float>();
@@ -56,7 +58,7 @@ public class ChessBoard : MonoBehaviour
     private int currentTeam = -1;
     private bool localGame = false;
     private bool computerGame = false;
-    private bool asyncGame = true;
+    private bool asyncGame = false;
     private bool[] playerRematch = new bool[2];
     private  Vector2Int[] myAsyncMove = {new Vector2Int(-1, -1), new Vector2Int(-1, -1)};
     private  Vector2Int[] enemyAsyncMove = {new Vector2Int(-1, -1), new Vector2Int(-1, -1)};
@@ -106,8 +108,8 @@ public class ChessBoard : MonoBehaviour
             if (Input.GetMouseButtonDown(0)){
                 if (chessPieces[hitPosition.x, hitPosition.y] != null && !waitingAsyncMove){
                     // Is it our turn?
-                    if ((chessPieces[hitPosition.x, hitPosition.y].team == 0 && asyncGame ? true : isWhiteTurn && currentTeam == 0) || 
-                        (chessPieces[hitPosition.x, hitPosition.y].team == 1 && asyncGame ? true : !isWhiteTurn && currentTeam == 1)){
+                    if ((chessPieces[hitPosition.x, hitPosition.y].team == 0 && (asyncGame ? true : isWhiteTurn) && currentTeam == 0) || 
+                        (chessPieces[hitPosition.x, hitPosition.y].team == 1 && (asyncGame ? true : !isWhiteTurn) && currentTeam == 1)){
                         CurrentlyDragging = chessPieces[hitPosition.x, hitPosition.y];
 
                         // Get a list of where I can go, highlight tiles as well
@@ -143,9 +145,20 @@ public class ChessBoard : MonoBehaviour
                 }
 
                 else{
+                    if(asyncGame && previousPosition != hitPosition){
+                        NetMakeMove mm = new NetMakeMove();
+                        mm.originalX = previousPosition.x;
+                        mm.originalY = previousPosition.y;
+                        mm.destinationX = hitPosition.x;
+                        mm.destinationY = hitPosition.y;
+                        mm.teamId = currentTeam;
+                        Client.Instance.SendToServer(mm);
+                    }
                     CurrentlyDragging.SetPosition(GetTileCenter(previousPosition.x, previousPosition.y));
                     CurrentlyDragging = null;
                     RemoveHighlightTiles();
+
+                    if(asyncGame && previousPosition != hitPosition) MoveTo(previousPosition.x, previousPosition.y, hitPosition.x, hitPosition.y);
                 }
             }
         }
@@ -669,6 +682,72 @@ public class ChessBoard : MonoBehaviour
                             return false;
                     }
 
+                    winnerTeam = targetTeam == 0 ? 1 : 0;
+                    return true; // Checkmate exit
+                }
+                else{
+                    List<Vector2Int> defendingMoves = new List<Vector2Int>();
+                    foreach (ChessPiece piece in defendingPieces)
+                    {
+                        defendingMoves.AddRange(piece.GetAvailableMoves(board, TILE_COUNT_X, TILE_COUNT_Y, moveList));
+
+                        if(defendingMoves.Count == 0)
+                            return false;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    private bool CheckForOwnCheckmate(ChessPiece[,] board = null){
+        if (board == null) board = chessPieces;
+
+        var lastMove = moveList[moveList.Count - 2];
+        if (board[lastMove[1].x, lastMove[1].y] != null){
+            int targetTeam = (board[lastMove[1].x, lastMove[1].y].team == 0) ? 1 : 0;
+
+            List<ChessPiece> attackingPieces = new List<ChessPiece>();
+            List<ChessPiece> defendingPieces = new List<ChessPiece>();
+            ChessPiece targetKing = null;
+            for (int x = 0; x < TILE_COUNT_X; x++)
+                for (int y = 0; y < TILE_COUNT_Y; y++)
+                    if (board[x, y] != null){
+                        if(board[x, y].team == targetTeam){
+                            defendingPieces.Add(board[x, y]);
+                            if(board[x, y].type == ChessPieceType.King)
+                                targetKing = board[x, y];
+                        }
+                        else{
+                            attackingPieces.Add(board[x, y]);
+                        }
+                    }
+
+            // Is the king being attacked right now?
+            List<Vector2Int> currentAvailableMoves = new List<Vector2Int> ();
+            for (int i = 0; i < attackingPieces.Count; i++)
+            {
+                var pieceMoves = attackingPieces[i].GetAvailableMoves(board, TILE_COUNT_X, TILE_COUNT_Y, moveList);
+                for (int b = 0; b < pieceMoves.Count; b++)
+                {
+                    currentAvailableMoves.Add(pieceMoves[b]);
+                }
+            }
+
+            // Are we in check right now?
+            if (targetKing != null){
+                if(ContainsValidMove(ref currentAvailableMoves, new Vector2Int(targetKing.currentX, targetKing.currentY))){
+                    // King is under attack, can we move something to help him?
+                    for (int i = 0; i < defendingPieces.Count; i++)
+                    {
+                        List<Vector2Int> defendingMoves = defendingPieces[i].GetAvailableMoves(board, TILE_COUNT_X, TILE_COUNT_Y, moveList);
+                        SimulateMoveForSinglePiece(defendingPieces[i], defendingMoves, targetKing, board);
+
+                        if(defendingMoves.Count != 0)
+                            return false;
+                    }
+
+                    winnerTeam = targetTeam == 0 ? 1 : 0;
                     return true; // Checkmate exit
                 }
                 else{
@@ -1049,8 +1128,8 @@ public class ChessBoard : MonoBehaviour
             // If it's from the enemy team
             if (otherCp.team == 0)
             {
-                //if (otherCp.type == ChessPieceType.King)
-                    //Checkmate(1);
+                if (otherCp.type == ChessPieceType.King && !simMode)
+                    Checkmate(1);
 
                 deadWhites.Add(otherCp);
                 if(!simMode){
@@ -1062,8 +1141,8 @@ public class ChessBoard : MonoBehaviour
             }
             else
             {
-                //if (otherCp.type == ChessPieceType.King)
-                    //Checkmate(0);
+                if (otherCp.type == ChessPieceType.King && !simMode)
+                    Checkmate(0);
 
                 deadBlacks.Add(otherCp);
                 if(!simMode){
@@ -1093,11 +1172,14 @@ public class ChessBoard : MonoBehaviour
 
         RemoveHighlightTiles();
 
-        if (CheckForCheckmate() && !simMode)
-            Checkmate(cp.team);
+        if(!asyncGame){
+            if (CheckForCheckmate() && !simMode)
+                Checkmate(winnerTeam);
 
-        if (CheckForStalemate() && !simMode)
-            Checkmate(2);
+            if (CheckForStalemate() && !simMode)
+                Checkmate(2);
+        }
+        
 
         return;
     }
@@ -1184,6 +1266,17 @@ public class ChessBoard : MonoBehaviour
 
     private void AsyncMove()
     {
+        List<Vector2Int> myMoves = new List<Vector2Int>();
+        List<Vector2Int> enemyMoves = new List<Vector2Int>();
+
+        if(myAsyncMove[1] != new Vector2Int(-1, -1)){
+            myMoves = chessPieces[myAsyncMove[0].x, myAsyncMove[0].y].GetAvailableMoves(chessPieces, TILE_COUNT_X, TILE_COUNT_Y, moveList);
+        }
+        if(enemyAsyncMove[1] != new Vector2Int(-1, -1)){
+            enemyMoves = chessPieces[enemyAsyncMove[0].x, enemyAsyncMove[0].y].GetAvailableMoves(chessPieces, TILE_COUNT_X, TILE_COUNT_Y, moveList);
+        }
+        
+
         if (enemyAsyncMove[1] != new Vector2Int(-1, -1))
         {
             if (myAsyncMove[1] != new Vector2Int(-1, -1))
@@ -1196,39 +1289,273 @@ public class ChessBoard : MonoBehaviour
                 }
                 else
                 {
-                    // Movimientos simultáneos sin conflicto
-                    MoveTo(myAsyncMove[0].x, myAsyncMove[0].y, myAsyncMove[1].x, myAsyncMove[1].y);
-                    MoveTo(enemyAsyncMove[0].x, enemyAsyncMove[0].y, enemyAsyncMove[1].x, enemyAsyncMove[1].y);
+                    if(myAsyncMove[1].x == enemyAsyncMove[0].x && myAsyncMove[1].y == enemyAsyncMove[0].y)
+                    {
+                        if(enemyAsyncMove[1].x == myAsyncMove[0].x && enemyAsyncMove[1].y == myAsyncMove[0].y)
+                        {
+                            if(chessPieces[myAsyncMove[0].x, myAsyncMove[0].y].value == chessPieces[enemyAsyncMove[0].x, enemyAsyncMove[0].y].value){
+                                if(ContainsValidMove(ref myMoves, myAsyncMove[1])) MoveTo(myAsyncMove[0].x, myAsyncMove[0].y, myAsyncMove[1].x, myAsyncMove[1].y);
+                                if(ContainsValidMove(ref enemyMoves, enemyAsyncMove[1])) MoveTo(enemyAsyncMove[0].x, enemyAsyncMove[0].y, enemyAsyncMove[1].x, enemyAsyncMove[1].y);
+                                if(ContainsValidMove(ref myMoves, myAsyncMove[1]) && ContainsValidMove(ref enemyMoves, enemyAsyncMove[1])){
+                                    ChessPiece cp = chessPieces[enemyAsyncMove[1].x, enemyAsyncMove[1].y];
+                                    chessPieces[enemyAsyncMove[1].x, enemyAsyncMove[1].y] = null;
+                                    if(cp.team == 0){
+                                        deadWhites.Add(cp);
+                                        cp.SetPosition(new Vector3(8.5f * tileSize, 0, -1 * tileSize)
+                                        - bounds
+                                        + new Vector3(tileSize / 2, 0, tileSize / 2)
+                                        + Vector3.forward * 0.33f * deadWhites.Count);
+                                    }
+                                    else{
+                                        deadBlacks.Add(cp);
+                                        cp.SetPosition(new Vector3(-1.5f * tileSize, 0, 8 * tileSize)
+                                        - bounds
+                                        + new Vector3(tileSize / 2, 0, tileSize / 2)
+                                        + Vector3.back * 0.33f * deadBlacks.Count);
+                                    }
+                                }
+                                
+                            }
+                            else{
+                                if(chessPieces[myAsyncMove[0].x, myAsyncMove[0].y].value < chessPieces[enemyAsyncMove[0].x, enemyAsyncMove[0].y].value){
+                                    if(ContainsValidMove(ref enemyMoves, enemyAsyncMove[1])) MoveTo(enemyAsyncMove[0].x, enemyAsyncMove[0].y, enemyAsyncMove[1].x, enemyAsyncMove[1].y);
+                                    if(chessPieces[enemyAsyncMove[0].x, enemyAsyncMove[0].y] != null){
+                                        myMoves = chessPieces[myAsyncMove[0].x, myAsyncMove[0].y].GetAvailableMoves(chessPieces, TILE_COUNT_X, TILE_COUNT_Y, moveList);
+                                        if(ContainsValidMove(ref myMoves, myAsyncMove[1])) MoveTo(myAsyncMove[0].x, myAsyncMove[0].y, myAsyncMove[1].x, myAsyncMove[1].y);
+                                    }
+                                }
+                                else{
+                                    if(ContainsValidMove(ref myMoves, myAsyncMove[1])) MoveTo(myAsyncMove[0].x, myAsyncMove[0].y, myAsyncMove[1].x, myAsyncMove[1].y);
+                                    if(chessPieces[myAsyncMove[0].x, myAsyncMove[0].y] != null){
+                                        enemyMoves = chessPieces[enemyAsyncMove[0].x, enemyAsyncMove[0].y].GetAvailableMoves(chessPieces, TILE_COUNT_X, TILE_COUNT_Y, moveList);
+                                        if(ContainsValidMove(ref enemyMoves, enemyAsyncMove[1])) MoveTo(enemyAsyncMove[0].x, enemyAsyncMove[0].y, enemyAsyncMove[1].x, enemyAsyncMove[1].y);
+                                    }
+                                }
+                            }
+                        }
+                        else{
+                            if(ContainsValidMove(ref enemyMoves, enemyAsyncMove[1])) MoveTo(enemyAsyncMove[0].x, enemyAsyncMove[0].y, enemyAsyncMove[1].x, enemyAsyncMove[1].y);
+                            myMoves = chessPieces[myAsyncMove[0].x, myAsyncMove[0].y].GetAvailableMoves(chessPieces, TILE_COUNT_X, TILE_COUNT_Y, moveList);
+                            if(ContainsValidMove(ref myMoves, myAsyncMove[1])) MoveTo(myAsyncMove[0].x, myAsyncMove[0].y, myAsyncMove[1].x, myAsyncMove[1].y);
+                        }
+                    }
+                    else if(enemyAsyncMove[1].x == myAsyncMove[0].x && enemyAsyncMove[1].y == myAsyncMove[0].y){
+                        if(myAsyncMove[1].x == enemyAsyncMove[0].x && myAsyncMove[1].y == enemyAsyncMove[0].y){
+                            if(chessPieces[myAsyncMove[0].x, myAsyncMove[0].y].value == chessPieces[enemyAsyncMove[0].x, enemyAsyncMove[0].y].value){
+                                if(ContainsValidMove(ref myMoves, myAsyncMove[1])) MoveTo(myAsyncMove[0].x, myAsyncMove[0].y, myAsyncMove[1].x, myAsyncMove[1].y);
+                                if(ContainsValidMove(ref enemyMoves, enemyAsyncMove[1])) MoveTo(enemyAsyncMove[0].x, enemyAsyncMove[0].y, enemyAsyncMove[1].x, enemyAsyncMove[1].y);
+                                if(ContainsValidMove(ref myMoves, myAsyncMove[1]) && ContainsValidMove(ref enemyMoves, enemyAsyncMove[1])){
+                                    ChessPiece cp = chessPieces[enemyAsyncMove[1].x, enemyAsyncMove[1].y];
+                                    chessPieces[enemyAsyncMove[1].x, enemyAsyncMove[1].y] = null;
+                                    if(cp.team == 0){
+                                        deadWhites.Add(cp);
+                                        cp.SetPosition(new Vector3(8.5f * tileSize, 0, -1 * tileSize)
+                                        - bounds
+                                        + new Vector3(tileSize / 2, 0, tileSize / 2)
+                                        + Vector3.forward * 0.33f * deadWhites.Count);
+                                    }
+                                    else{
+                                        deadBlacks.Add(cp);
+                                        cp.SetPosition(new Vector3(-1.5f * tileSize, 0, 8 * tileSize)
+                                        - bounds
+                                        + new Vector3(tileSize / 2, 0, tileSize / 2)
+                                        + Vector3.back * 0.33f * deadBlacks.Count);
+                                    }
+                                }
+                                
+                            }
+                            else{
+                                if(chessPieces[myAsyncMove[0].x, myAsyncMove[0].y].value < chessPieces[enemyAsyncMove[0].x, enemyAsyncMove[0].y].value){
+                                    if(ContainsValidMove(ref enemyMoves, enemyAsyncMove[1])) MoveTo(enemyAsyncMove[0].x, enemyAsyncMove[0].y, enemyAsyncMove[1].x, enemyAsyncMove[1].y);
+                                    if(chessPieces[enemyAsyncMove[0].x, enemyAsyncMove[0].y] != null){
+                                        myMoves = chessPieces[myAsyncMove[0].x, myAsyncMove[0].y].GetAvailableMoves(chessPieces, TILE_COUNT_X, TILE_COUNT_Y, moveList);
+                                        if(ContainsValidMove(ref myMoves, myAsyncMove[1])) MoveTo(myAsyncMove[0].x, myAsyncMove[0].y, myAsyncMove[1].x, myAsyncMove[1].y);
+                                    }
+                                }
+                                else{
+                                    if(ContainsValidMove(ref myMoves, myAsyncMove[1])) MoveTo(myAsyncMove[0].x, myAsyncMove[0].y, myAsyncMove[1].x, myAsyncMove[1].y);
+                                    if(chessPieces[myAsyncMove[0].x, myAsyncMove[0].y] != null){
+                                        enemyMoves = chessPieces[enemyAsyncMove[0].x, enemyAsyncMove[0].y].GetAvailableMoves(chessPieces, TILE_COUNT_X, TILE_COUNT_Y, moveList);
+                                        if(ContainsValidMove(ref enemyMoves, enemyAsyncMove[1])) MoveTo(enemyAsyncMove[0].x, enemyAsyncMove[0].y, enemyAsyncMove[1].x, enemyAsyncMove[1].y);
+                                    }
+                                }
+                            }
+                        }
+                        else{
+                            if(ContainsValidMove(ref myMoves, myAsyncMove[1])) MoveTo(myAsyncMove[0].x, myAsyncMove[0].y, myAsyncMove[1].x, myAsyncMove[1].y);
+                            enemyMoves = chessPieces[enemyAsyncMove[0].x, enemyAsyncMove[0].y].GetAvailableMoves(chessPieces, TILE_COUNT_X, TILE_COUNT_Y, moveList);
+                            if(ContainsValidMove(ref enemyMoves, enemyAsyncMove[1])) MoveTo(enemyAsyncMove[0].x, enemyAsyncMove[0].y, enemyAsyncMove[1].x, enemyAsyncMove[1].y);
+                        }
+                    }
+                    else{
+                        if(chessPieces[myAsyncMove[0].x, myAsyncMove[0].y].type == ChessPieceType.Pawn && myAsyncMove[0].x != myAsyncMove[1].x){
+                            if(chessPieces[enemyAsyncMove[0].x, enemyAsyncMove[0].y].type == ChessPieceType.Pawn && enemyAsyncMove[0].x != enemyAsyncMove[1].x){
+                                if(ContainsValidMove(ref enemyMoves, enemyAsyncMove[1])) MoveTo(enemyAsyncMove[0].x, enemyAsyncMove[0].y, enemyAsyncMove[1].x, enemyAsyncMove[1].y);
+                                if(ContainsValidMove(ref myMoves, myAsyncMove[1])) MoveTo(myAsyncMove[0].x, myAsyncMove[0].y, myAsyncMove[1].x, myAsyncMove[1].y);
+                            }
+                            else{
+                                Debug.Log("Entró");
+                                if(ContainsValidMove(ref enemyMoves, enemyAsyncMove[1])) MoveTo(enemyAsyncMove[0].x, enemyAsyncMove[0].y, enemyAsyncMove[1].x, enemyAsyncMove[1].y);
+                                myMoves = chessPieces[myAsyncMove[0].x, myAsyncMove[0].y].GetAvailableMoves(chessPieces, TILE_COUNT_X, TILE_COUNT_Y, moveList);
+                                if(ContainsValidMove(ref myMoves, myAsyncMove[1])) MoveTo(myAsyncMove[0].x, myAsyncMove[0].y, myAsyncMove[1].x, myAsyncMove[1].y);
+                            }
+                        }
+                        else if(chessPieces[enemyAsyncMove[0].x, enemyAsyncMove[0].y].type == ChessPieceType.Pawn && enemyAsyncMove[0].x != enemyAsyncMove[1].x){
+                            if(chessPieces[myAsyncMove[0].x, myAsyncMove[0].y].type == ChessPieceType.Pawn && myAsyncMove[0].x != myAsyncMove[1].x){
+                                if(ContainsValidMove(ref myMoves, myAsyncMove[1])) MoveTo(myAsyncMove[0].x, myAsyncMove[0].y, myAsyncMove[1].x, myAsyncMove[1].y);
+                                if(ContainsValidMove(ref enemyMoves, enemyAsyncMove[1])) MoveTo(enemyAsyncMove[0].x, enemyAsyncMove[0].y, enemyAsyncMove[1].x, enemyAsyncMove[1].y);
+                            }
+                            else{
+                                Debug.Log("Entró");
+                                if(ContainsValidMove(ref myMoves, myAsyncMove[1])) MoveTo(myAsyncMove[0].x, myAsyncMove[0].y, myAsyncMove[1].x, myAsyncMove[1].y);
+                                enemyMoves = chessPieces[enemyAsyncMove[0].x, enemyAsyncMove[0].y].GetAvailableMoves(chessPieces, TILE_COUNT_X, TILE_COUNT_Y, moveList);
+                                if(ContainsValidMove(ref enemyMoves, enemyAsyncMove[1])) MoveTo(enemyAsyncMove[0].x, enemyAsyncMove[0].y, enemyAsyncMove[1].x, enemyAsyncMove[1].y);
+                            }
+                        }
+                        else{
+                            if(chessPieces[myAsyncMove[0].x, myAsyncMove[0].y].value < chessPieces[enemyAsyncMove[0].x, enemyAsyncMove[0].y].value){
+                                if(ContainsValidMove(ref enemyMoves, enemyAsyncMove[1])) MoveTo(enemyAsyncMove[0].x, enemyAsyncMove[0].y, enemyAsyncMove[1].x, enemyAsyncMove[1].y);
+                                if(ContainsValidMove(ref myMoves, myAsyncMove[1])) MoveTo(myAsyncMove[0].x, myAsyncMove[0].y, myAsyncMove[1].x, myAsyncMove[1].y);
+                            }
+                            else{
+                                if(ContainsValidMove(ref myMoves, myAsyncMove[1])) MoveTo(myAsyncMove[0].x, myAsyncMove[0].y, myAsyncMove[1].x, myAsyncMove[1].y);
+                                if(ContainsValidMove(ref enemyMoves, enemyAsyncMove[1])) MoveTo(enemyAsyncMove[0].x, enemyAsyncMove[0].y, enemyAsyncMove[1].x, enemyAsyncMove[1].y);
+                            }
+                        }
+                    }
                 }
 
+                //Debug.Log(moveList[moveList.Count - 2][1] + " " + moveList[moveList.Count - 1][1]);
                 // Reiniciar los movimientos asíncronos
                 ResetAsyncMoves();
+                Debug.Log("Checkmate check");
+                if (CheckForCheckmate()){
+                    Debug.Log("Checkmate for: " + winnerTeam);
+                    Checkmate(winnerTeam);
+                    winnerTeam = -1;
+                }
+
+                if (CheckForOwnCheckmate()){
+                    Debug.Log("Checkmate for: " + winnerTeam);
+                    Checkmate(winnerTeam);
+                    winnerTeam = -1;
+                }
+
+
+                if (CheckForStalemate())
+                    Checkmate(2);
             }
         }
-        else
-        {
-            //Debug.Log("sigue en el else después de enviar el movimiento");
-        }
-        //Debug.Log("sale del else");
-        //Debug.Log($"{(currentTeam == 0 ? "White" : "Black")} move: {myAsyncMove[1]} vs {enemyAsyncMove[1]}");
     }
 
     private void ResolveConflict(Vector2Int[] myMove, Vector2Int[] enemyMove)
     {
-        // Resolver conflicto: Prioridad al jugador cuyo turno es
-        if ((isWhiteTurn && currentTeam == 0) || (!isWhiteTurn && currentTeam == 1))
-        {
-            // Mi movimiento tiene prioridad
-            MoveTo(myMove[0].x, myMove[0].y, myMove[1].x, myMove[1].y);
+        List<Vector2Int> myMoves = new List<Vector2Int>(chessPieces[myMove[0].x, myMove[0].y].GetAvailableMoves(chessPieces, TILE_COUNT_X, TILE_COUNT_Y, moveList));
+        List<Vector2Int> enemyMoves = new List<Vector2Int>(chessPieces[enemyMove[0].x, enemyMove[0].y].GetAvailableMoves(chessPieces, TILE_COUNT_X, TILE_COUNT_Y, moveList));
+        
+        if(chessPieces[myMove[1].x, myMove[1].y] != null){
+            if(chessPieces[myMove[0].x, myMove[0].y].team != chessPieces[myMove[1].x, myMove[1].y].team){
+                if(ContainsValidMove(ref myMoves, myAsyncMove[1])) MoveTo(myMove[0].x, myMove[0].y, myMove[1].x, myMove[1].y);
+                enemyMoves = chessPieces[enemyAsyncMove[0].x, enemyAsyncMove[0].y].GetAvailableMoves(chessPieces, TILE_COUNT_X, TILE_COUNT_Y, moveList);
+                if(ContainsValidMove(ref enemyMoves, enemyAsyncMove[1])) MoveTo(enemyMove[0].x, enemyMove[0].y, enemyMove[1].x, enemyMove[1].y);
+            }
+            else{
+                if(ContainsValidMove(ref enemyMoves, enemyAsyncMove[1])) MoveTo(enemyMove[0].x, enemyMove[0].y, enemyMove[1].x, enemyMove[1].y);
+                myMoves = new List<Vector2Int>(chessPieces[myMove[0].x, myMove[0].y].GetAvailableMoves(chessPieces, TILE_COUNT_X, TILE_COUNT_Y, moveList));
+                if(ContainsValidMove(ref myMoves, myAsyncMove[1])) MoveTo(myMove[0].x, myMove[0].y, myMove[1].x, myMove[1].y);
+            }
         }
-        else
-        {
-            // El movimiento del oponente tiene prioridad
-            MoveTo(enemyMove[0].x, enemyMove[0].y, enemyMove[1].x, enemyMove[1].y);
+        else{
+            if(chessPieces[myMove[0].x, myMove[0].y].type == ChessPieceType.Pawn && myMove[0].x != myMove[1].x){
+                if(chessPieces[enemyMove[0].x, enemyMove[0].y].type == ChessPieceType.Pawn && enemyMove[0].x != enemyMove[1].x){
+                    return;
+                }
+                else{
+                    if(ContainsValidMove(ref enemyMoves, enemyAsyncMove[1])) MoveTo(enemyMove[0].x, enemyMove[0].y, enemyMove[1].x, enemyMove[1].y);
+                    myMoves = new List<Vector2Int>(chessPieces[myMove[0].x, myMove[0].y].GetAvailableMoves(chessPieces, TILE_COUNT_X, TILE_COUNT_Y, moveList));
+                    if(ContainsValidMove(ref myMoves, myAsyncMove[1])) MoveTo(myMove[0].x, myMove[0].y, myMove[1].x, myMove[1].y);
+                }
+            }
+            else if(chessPieces[enemyMove[0].x, enemyMove[0].y].type == ChessPieceType.Pawn && enemyMove[0].x != enemyMove[1].x){
+                if(chessPieces[myMove[0].x, myMove[0].y].type == ChessPieceType.Pawn && myMove[0].x != myMove[1].x){
+                    return;
+                }
+                else{
+                    if(ContainsValidMove(ref myMoves, myAsyncMove[1])) MoveTo(myMove[0].x, myMove[0].y, myMove[1].x, myMove[1].y);
+                    enemyMoves = chessPieces[enemyAsyncMove[0].x, enemyAsyncMove[0].y].GetAvailableMoves(chessPieces, TILE_COUNT_X, TILE_COUNT_Y, moveList);
+                    if(ContainsValidMove(ref enemyMoves, enemyAsyncMove[1])) MoveTo(enemyMove[0].x, enemyMove[0].y, enemyMove[1].x, enemyMove[1].y);
+                }
+            }
+            else{
+                if(chessPieces[myMove[0].x, myMove[0].y].type == ChessPieceType.Pawn && myMove[0].x == myMove[1].x){
+                    if(chessPieces[enemyMove[0].x, enemyMove[0].y].type == ChessPieceType.Pawn && enemyMove[0].x == enemyMove[1].x){
+                        return;
+                    }
+                    else{
+                        if(ContainsValidMove(ref myMoves, myAsyncMove[1])) MoveTo(myMove[0].x, myMove[0].y, myMove[1].x, myMove[1].y);
+                        enemyMoves = chessPieces[enemyAsyncMove[0].x, enemyAsyncMove[0].y].GetAvailableMoves(chessPieces, TILE_COUNT_X, TILE_COUNT_Y, moveList);
+                        if(ContainsValidMove(ref enemyMoves, enemyAsyncMove[1])) MoveTo(enemyMove[0].x, enemyMove[0].y, enemyMove[1].x, enemyMove[1].y);
+                    }
+                }
+                else if(chessPieces[enemyMove[0].x, enemyMove[0].y].type == ChessPieceType.Pawn && enemyMove[0].x == enemyMove[1].x){
+                    if(chessPieces[myMove[0].x, myMove[0].y].type == ChessPieceType.Pawn && myMove[0].x == myMove[1].x){
+                        return;
+                    }
+                    else{
+                        if(ContainsValidMove(ref enemyMoves, enemyAsyncMove[1])) MoveTo(enemyMove[0].x, enemyMove[0].y, enemyMove[1].x, enemyMove[1].y);
+                        myMoves = new List<Vector2Int>(chessPieces[myMove[0].x, myMove[0].y].GetAvailableMoves(chessPieces, TILE_COUNT_X, TILE_COUNT_Y, moveList));
+                        if(ContainsValidMove(ref myMoves, myAsyncMove[1])) MoveTo(myMove[0].x, myMove[0].y, myMove[1].x, myMove[1].y);
+                    }
+                }
+                else if(chessPieces[enemyMove[0].x, enemyMove[0].y].type == ChessPieceType.King){  
+                    if(chessPieces[myMove[0].x, myMove[0].y].type == ChessPieceType.King){
+                        return;
+                    }
+                    else{
+                        if(ContainsValidMove(ref myMoves, myAsyncMove[1])) MoveTo(myMove[0].x, myMove[0].y, myMove[1].x, myMove[1].y);
+                        enemyMoves = chessPieces[enemyAsyncMove[0].x, enemyAsyncMove[0].y].GetAvailableMoves(chessPieces, TILE_COUNT_X, TILE_COUNT_Y, moveList);
+                        if(ContainsValidMove(ref enemyMoves, enemyAsyncMove[1])) MoveTo(enemyMove[0].x, enemyMove[0].y, enemyMove[1].x, enemyMove[1].y);
+                    }
+                }
+                else if(chessPieces[myMove[0].x, myMove[0].y].type == ChessPieceType.King){  
+                    if(chessPieces[enemyMove[0].x, enemyMove[0].y].type == ChessPieceType.King){
+                        return;
+                    }
+                    else{
+                        if(ContainsValidMove(ref enemyMoves, enemyAsyncMove[1])) MoveTo(enemyMove[0].x, enemyMove[0].y, enemyMove[1].x, enemyMove[1].y);
+                        myMoves = new List<Vector2Int>(chessPieces[myMove[0].x, myMove[0].y].GetAvailableMoves(chessPieces, TILE_COUNT_X, TILE_COUNT_Y, moveList));
+                        if(ContainsValidMove(ref myMoves, myAsyncMove[1])) MoveTo(myMove[0].x, myMove[0].y, myMove[1].x, myMove[1].y);
+                    }
+                }
+                else{
+                    if(ContainsValidMove(ref myMoves, myAsyncMove[1])) MoveTo(myMove[0].x, myMove[0].y, myMove[1].x, myMove[1].y);
+                    enemyMoves = chessPieces[enemyAsyncMove[0].x, enemyAsyncMove[0].y].GetAvailableMoves(chessPieces, TILE_COUNT_X, TILE_COUNT_Y, moveList);
+                    if(ContainsValidMove(ref enemyMoves, enemyAsyncMove[1])) MoveTo(enemyMove[0].x, enemyMove[0].y, enemyMove[1].x, enemyMove[1].y);
+                    if(ContainsValidMove(ref myMoves, myAsyncMove[1]) && ContainsValidMove(ref enemyMoves, enemyAsyncMove[1])){
+                        ChessPiece cp = chessPieces[enemyMove[1].x, enemyMove[1].y];
+                        chessPieces[enemyMove[1].x, enemyMove[1].y] = null;
+                        if(cp.team == 0){
+                            deadWhites.Add(cp);
+                            cp.SetPosition(new Vector3(8.5f * tileSize, 0, -1 * tileSize)
+                            - bounds
+                            + new Vector3(tileSize / 2, 0, tileSize / 2)
+                            + Vector3.forward * 0.33f * deadWhites.Count);
+                        }
+                        else{
+                            deadBlacks.Add(cp);
+                            cp.SetPosition(new Vector3(-1.5f * tileSize, 0, 8 * tileSize)
+                            - bounds
+                            + new Vector3(tileSize / 2, 0, tileSize / 2)
+                            + Vector3.back * 0.33f * deadBlacks.Count);
+                        }
+                    }
+                }
+                
+            }
         }
-
+            
         // Restaurar la pieza perdedora a su posición original
-        Debug.Log("Conflict resolved: Priority given to " + (isWhiteTurn ? "White" : "Black"));
+        Debug.Log("Conflict resolved");
     }
 
     private void ResetAsyncMoves()
@@ -1238,6 +1565,23 @@ public class ChessBoard : MonoBehaviour
         enemyAsyncMove[0] = new Vector2Int(-1, -1);
         enemyAsyncMove[1] = new Vector2Int(-1, -1);
         waitingAsyncMove = false;
+    }
+
+    public void HandleModeDropdown(int index){
+        switch (index){
+            case 0:
+                Debug.Log("Std game selected");
+                asyncGame = false;
+                break;
+            case 1:
+                Debug.Log("Async game selected");
+                asyncGame = true;
+                break;
+            case 2:
+                //denialGame = true;
+                asyncGame = false;
+                break;
+        }
     }
 
     #region
@@ -1282,10 +1626,20 @@ public class ChessBoard : MonoBehaviour
         // Return back to the client
         Server.Instance.SendToClient(cnn, nw);
 
+        NetStartGame sg = new NetStartGame();
+        if(asyncGame){
+            sg.gameMode = 1;
+        }
+        // else if(denialGame){
+        //     sg.gameMode = 2;
+        // }
+        else{
+            sg.gameMode = 0;
+        }
+
         // If full, start the game
         if(playerCount == 1)
-            Server.Instance.Broadcast(new NetStartGame());
-        
+            Server.Instance.Broadcast(sg);
     }
 
     private void OnMakeMoveServer(NetMessage msg, NetworkConnection cnn)
@@ -1318,6 +1672,21 @@ public class ChessBoard : MonoBehaviour
 
     private void OnStartGameClient(NetMessage message)
     {
+        NetStartGame sg = message as NetStartGame;
+
+        if(sg.gameMode == 0){
+            // Local game
+            asyncGame = false;
+        }
+        else if(sg.gameMode == 1){
+            // Asynchronous game
+            asyncGame = true;
+        }
+        else if(sg.gameMode == 2){
+            // Denial game
+            asyncGame = false;
+        }
+
         // We just need to change the camera
         GameUI.Instance.ChangeCamera((currentTeam == 0) ? CameraAngle.whiteTeam : CameraAngle.blackTeam);
     }
@@ -1389,6 +1758,7 @@ public class ChessBoard : MonoBehaviour
         currentTeam = -1;
         localGame = false;
         computerGame = false;
+
     }
     #endregion
 }

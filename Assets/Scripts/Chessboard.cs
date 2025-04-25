@@ -126,22 +126,32 @@ public class ChessBoard : MonoBehaviour
                 Vector2Int previousPosition = new Vector2Int(CurrentlyDragging.currentX, CurrentlyDragging.currentY);
 
                 if(ContainsValidMove(ref availableMoves, new Vector2Int(hitPosition.x, hitPosition.y))){
-                    // Net implementation
-                    NetMakeMove mm = new NetMakeMove();
-                    mm.originalX = previousPosition.x;
-                    mm.originalY = previousPosition.y;
-                    mm.destinationX = hitPosition.x;
-                    mm.destinationY = hitPosition.y;
-                    mm.teamId = currentTeam;
-                    Client.Instance.SendToServer(mm);
-
                     if(asyncGame){
+                        NetMakeMove mm = new NetMakeMove();
+                        mm.originalX = previousPosition.x;
+                        mm.originalY = previousPosition.y;
+                        mm.destinationX = hitPosition.x;
+                        mm.destinationY = hitPosition.y;
+                        mm.teamId = currentTeam;
+                        Client.Instance.SendToServer(mm);
+
                         CurrentlyDragging.SetPosition(GetTileCenter(CurrentlyDragging.currentX, CurrentlyDragging.currentY));
                         CurrentlyDragging = null;
                         RemoveHighlightTiles();
+                        
+                        MoveTo(previousPosition.x, previousPosition.y, hitPosition.x, hitPosition.y);
                     }
-                    
-                    MoveTo(previousPosition.x, previousPosition.y, hitPosition.x, hitPosition.y);
+                    else{
+                        MoveTo(previousPosition.x, previousPosition.y, hitPosition.x, hitPosition.y);
+
+                        NetMakeMove mm = new NetMakeMove();
+                        mm.originalX = previousPosition.x;
+                        mm.originalY = previousPosition.y;
+                        mm.destinationX = hitPosition.x;
+                        mm.destinationY = hitPosition.y;
+                        mm.teamId = currentTeam;
+                        Client.Instance.SendToServer(mm);
+                    }                    
                 }
 
                 else{
@@ -1100,8 +1110,6 @@ public class ChessBoard : MonoBehaviour
 
     private void MoveTo(int originalX, int originalY, int x, int y, bool simMode = false, ChessPiece[,] board = null)
     {
-        if(localGame) Debug.Log("localGame is on");
-        Debug.Log("Current team: " + currentTeam);
         if (board == null) board = this.chessPieces;
 
         if(asyncGame && myAsyncMove[1] == new Vector2Int(-1, -1)){
@@ -1699,7 +1707,6 @@ public class ChessBoard : MonoBehaviour
         NetMakeMove mm = message as NetMakeMove;
 
         Debug.Log($"MM : {mm.teamId} : {mm.originalX} {mm.originalY} -> {mm.destinationX} {mm.destinationY}");
-
         
         if(asyncGame){
             if(mm.teamId != currentTeam){
@@ -1710,8 +1717,7 @@ public class ChessBoard : MonoBehaviour
         }
         else if(mm.teamId != currentTeam){
             MoveTo(mm.originalX, mm.originalY, mm.destinationX, mm.destinationY);
-        }
-        
+        }  
     }
 
     private void OnRematchClient(NetMessage message)

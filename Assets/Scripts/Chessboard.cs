@@ -1100,6 +1100,8 @@ public class ChessBoard : MonoBehaviour
 
     private void MoveTo(int originalX, int originalY, int x, int y, bool simMode = false, ChessPiece[,] board = null)
     {
+        if(localGame) Debug.Log("localGame is on");
+        Debug.Log("Current team: " + currentTeam);
         if (board == null) board = this.chessPieces;
 
         if(asyncGame && myAsyncMove[1] == new Vector2Int(-1, -1)){
@@ -1698,15 +1700,16 @@ public class ChessBoard : MonoBehaviour
 
         Debug.Log($"MM : {mm.teamId} : {mm.originalX} {mm.originalY} -> {mm.destinationX} {mm.destinationY}");
 
-        if(mm.teamId != currentTeam && !asyncGame){
-            MoveTo(mm.originalX, mm.originalY, mm.destinationX, mm.destinationY);
-        }
+        
         if(asyncGame){
             if(mm.teamId != currentTeam){
                 enemyAsyncMove[0] = new Vector2Int(mm.originalX, mm.originalY);
                 enemyAsyncMove[1] = new Vector2Int(mm.destinationX, mm.destinationY);
             }
             AsyncMove();
+        }
+        else if(mm.teamId != currentTeam){
+            MoveTo(mm.originalX, mm.originalY, mm.destinationX, mm.destinationY);
         }
         
     }

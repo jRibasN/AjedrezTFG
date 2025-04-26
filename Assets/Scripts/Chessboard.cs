@@ -21,6 +21,7 @@ public class ChessBoard : MonoBehaviour
     [SerializeField] private GameObject victoryScreen;
     [SerializeField] private Transform rematchIndicator;
     [SerializeField] private Button rematchButton;
+    [SerializeField] private Button denyMoveButton;
 
     [Header("Prefabs & Materials")]
     [SerializeField] private GameObject[] prefabs;
@@ -59,9 +60,12 @@ public class ChessBoard : MonoBehaviour
     private bool localGame = false;
     private bool computerGame = false;
     private bool asyncGame = false;
+    private bool denialGame = false;
     private bool[] playerRematch = new bool[2];
     private  Vector2Int[] myAsyncMove = {new Vector2Int(-1, -1), new Vector2Int(-1, -1)};
     private  Vector2Int[] enemyAsyncMove = {new Vector2Int(-1, -1), new Vector2Int(-1, -1)};
+    private Vector2Int[] denialMove = {new Vector2Int(-1, -1), new Vector2Int(-1, -1)};
+    private bool deniedMove = false;
     
     private void Start() {
         GenerateAllTiles(tileSize, TILE_COUNT_X, TILE_COUNT_Y);
@@ -114,6 +118,9 @@ public class ChessBoard : MonoBehaviour
 
                         // Get a list of where I can go, highlight tiles as well
                         availableMoves = CurrentlyDragging.GetAvailableMoves(chessPieces, TILE_COUNT_X, TILE_COUNT_Y, moveList);
+                        if(denialGame && deniedMove){
+                            availableMoves.Remove(denialMove[1]);
+                        }
                         // Get a list of special moves as well
                         PreventCheck(CurrentlyDragging.team, CurrentlyDragging, ref availableMoves);
                         HighlightTiles();
@@ -1121,6 +1128,12 @@ public class ChessBoard : MonoBehaviour
             AsyncMove();
             return;
         }
+        if(denialGame && !deniedMove){
+            denialMove[0].x = originalX;
+            denialMove[0].y = originalY;
+            denialMove[1].x = x;
+            denialMove[1].y = y;
+        }
 
         // Debug.Log("Moving from " + originalX + ", " + originalY + " to " + x + ", " + y);
         ChessPiece cp = board[originalX, originalY];
@@ -1183,18 +1196,30 @@ public class ChessBoard : MonoBehaviour
         RemoveHighlightTiles();
 
         if(!asyncGame){
-            if (CheckForCheckmate() && !simMode)
-                Checkmate(winnerTeam);
-
-            if (CheckForStalemate() && !simMode)
-                Checkmate(2);
+            if (CheckForCheckmate() && !simMode){
+                if(!denialGame){
+                    Checkmate(winnerTeam);
+                }
+                else if(denialGame && deniedMove){
+                    Checkmate(winnerTeam);
+                }
+            }
+                
+            if (CheckForStalemate() && !simMode){
+                if(!denialGame){
+                    Checkmate(2);
+                }
+                else if(denialGame && deniedMove){
+                    Checkmate(2);
+                }
+            }
         }
         
 
         return;
     }
 
-    private void UndoMove(int originalX, int originalY, int moveX, int moveY, bool captureInstance, bool promotionInstance, bool enPassantInstance, bool castleInstance, ChessPiece[,] board = null){
+    private void UndoMove(int originalX, int originalY, int moveX, int moveY, bool captureInstance, bool promotionInstance, bool enPassantInstance, bool castleInstance, ChessPiece[,] board = null, bool simMode = true){
         if (board == null) board = this.chessPieces;
         //Debug.Log("Undoing move from " + moveX + ", " + moveY + " to " + originalX + ", " + originalY);
         ChessPiece cp = board[moveX, moveY];
@@ -1215,12 +1240,12 @@ public class ChessBoard : MonoBehaviour
             restoredPiece = capturedPieces.Pop();
             if(cp.team == 0){
                 board[moveX, moveY - 1] = restoredPiece;
-                PositionSinglePiece(moveX, moveY - 1, true);
+                PositionSinglePiece(moveX, moveY - 1, simMode);
                 deadBlacks.Remove(restoredPiece);
             }
             else{
                 board[moveX, moveY + 1] = restoredPiece;
-                PositionSinglePiece(moveX, moveY + 1, true);
+                PositionSinglePiece(moveX, moveY + 1, simMode);
                 deadWhites.Remove(restoredPiece);
             }
         }
@@ -1229,25 +1254,25 @@ public class ChessBoard : MonoBehaviour
             if(moveX == 2 && moveY == 0){
                 ChessPiece rook = board[3, 0];
                 board[0, 0] = rook;
-                PositionSinglePiece(0, 0, true);
+                PositionSinglePiece(0, 0, simMode);
                 board[3, 0] = null;
             }
             else if(moveX == 6 && moveY == 0){
                 ChessPiece rook = board[5, 0];
                 board[7, 0] = rook;
-                PositionSinglePiece(7, 0, true);
+                PositionSinglePiece(7, 0, simMode);
                 board[5, 0] = null;
             }
             else if(moveX == 2 && moveY == 7){
                 ChessPiece rook = board[3, 7];
                 board[0, 7] = rook;
-                PositionSinglePiece(0, 7, true);
+                PositionSinglePiece(0, 7, simMode);
                 board[3, 7] = null;
             }
             else if(moveX == 6 && moveY == 7){
                 ChessPiece rook = board[5, 7];
                 board[7, 7] = rook;
-                PositionSinglePiece(7, 7, true);
+                PositionSinglePiece(7, 7, simMode);
                 board[5, 7] = null;
             }
         }
@@ -1260,11 +1285,11 @@ public class ChessBoard : MonoBehaviour
             board[originalX, originalY] = pawn;
         }
 
-        PositionSinglePiece(originalX, originalY, true);
+        PositionSinglePiece(originalX, originalY, simMode);
 
         if (restoredPiece != null && captureInstance){
             board[moveX, moveY] = restoredPiece;
-            PositionSinglePiece(moveX, moveY, true);
+            PositionSinglePiece(moveX, moveY, simMode);
         }
         else{
             board[moveX, moveY] = null;
@@ -1582,16 +1607,31 @@ public class ChessBoard : MonoBehaviour
             case 0:
                 Debug.Log("Std game selected");
                 asyncGame = false;
+                denialGame = false;
                 break;
             case 1:
                 Debug.Log("Async game selected");
                 asyncGame = true;
+                denialGame = false;
                 break;
             case 2:
+                Debug.Log("Denial game selected");
                 //denialGame = true;
                 asyncGame = false;
+                denialGame = true;
                 break;
         }
+    }
+
+    public void OnDenyMoveButton(){
+        denyMoveButton.interactable = false;
+        NetUndoMove um = new NetUndoMove();
+        um.originalX = denialMove[0].x;
+        um.originalY = denialMove[0].y;
+        um.destinationX = denialMove[1].x;
+        um.destinationY = denialMove[1].y;
+        Client.Instance.SendToServer(um);
+        Debug.Log("Undo move sent to server");
     }
 
     #region
@@ -1599,11 +1639,13 @@ public class ChessBoard : MonoBehaviour
         NetUtility.S_WELCOME += OnWelcomeServer;
         NetUtility.S_MAKE_MOVE += OnMakeMoveServer;
         NetUtility.S_REMATCH += OnRematchServer;
+        NetUtility.S_UNDO_MOVE += OnUndoMoveServer;
 
         NetUtility.C_WELCOME += OnWelcomeClient;
         NetUtility.C_START_GAME += OnStartGameClient;
         NetUtility.C_MAKE_MOVE += OnMakeMoveClient;
         NetUtility.C_REMATCH += OnRematchClient;
+        NetUtility.C_UNDO_MOVE += OnUndoMoveClient;
 
         GameUI.Instance.SetLocalGame += OnSetLocalGame;
         GameUI.Instance.SetComputerGame += OnSetComputerGame;
@@ -1613,11 +1655,13 @@ public class ChessBoard : MonoBehaviour
         NetUtility.S_WELCOME -= OnWelcomeServer;
         NetUtility.S_MAKE_MOVE -= OnMakeMoveServer;
         NetUtility.S_REMATCH -= OnRematchServer;
+        NetUtility.S_UNDO_MOVE -= OnUndoMoveServer;
 
         NetUtility.C_WELCOME -= OnWelcomeClient;
         NetUtility.C_START_GAME -= OnStartGameClient;
         NetUtility.C_MAKE_MOVE -= OnMakeMoveClient;
         NetUtility.C_REMATCH -= OnRematchClient;
+        NetUtility.C_UNDO_MOVE -= OnUndoMoveClient;
 
         GameUI.Instance.SetLocalGame -= OnSetLocalGame;
         GameUI.Instance.SetComputerGame -= OnSetComputerGame;
@@ -1640,9 +1684,9 @@ public class ChessBoard : MonoBehaviour
         if(asyncGame){
             sg.gameMode = 1;
         }
-        // else if(denialGame){
-        //     sg.gameMode = 2;
-        // }
+        else if(denialGame){
+            sg.gameMode = 2;
+        }
         else{
             sg.gameMode = 0;
         }
@@ -1663,6 +1707,12 @@ public class ChessBoard : MonoBehaviour
     private void OnRematchServer(NetMessage msg, NetworkConnection cnn)
     {
         Server.Instance.Broadcast(msg);
+    }
+
+    private void OnUndoMoveServer(NetMessage msg, NetworkConnection cnn)
+    {
+        NetUndoMove um = msg as NetUndoMove;
+        Server.Instance.Broadcast(um);
     }
 
     // Client
@@ -1687,14 +1737,19 @@ public class ChessBoard : MonoBehaviour
         if(sg.gameMode == 0){
             // Local game
             asyncGame = false;
+            denialGame = false;
         }
         else if(sg.gameMode == 1){
             // Asynchronous game
             asyncGame = true;
+            denialGame = false;
         }
         else if(sg.gameMode == 2){
             // Denial game
             asyncGame = false;
+            denialGame = true;
+            denyMoveButton.gameObject.SetActive(true);
+            denyMoveButton.interactable = false;
         }
 
         // We just need to change the camera
@@ -1715,8 +1770,20 @@ public class ChessBoard : MonoBehaviour
             }
             AsyncMove();
         }
+        else if(denialGame && !deniedMove){
+            if(mm.teamId != currentTeam){
+                denialMove[0] = new Vector2Int(mm.originalX, mm.originalY);
+                denialMove[1] = new Vector2Int(mm.destinationX, mm.destinationY);
+                MoveTo(mm.originalX, mm.originalY, mm.destinationX, mm.destinationY);
+                denyMoveButton.interactable = true;
+            }
+            else if(mm.teamId == currentTeam){
+                denyMoveButton.interactable = false;
+            }
+        }
         else if(mm.teamId != currentTeam){
             MoveTo(mm.originalX, mm.originalY, mm.destinationX, mm.destinationY);
+            deniedMove = false;
         }  
     }
 
@@ -1741,6 +1808,18 @@ public class ChessBoard : MonoBehaviour
         if(playerRematch[0] && playerRematch[1])
             GameReset();
             
+    }
+
+    private void OnUndoMoveClient(NetMessage message)
+    {
+        Debug.Log("OnUndoMoveClient called");
+        NetUndoMove um = message as NetUndoMove;
+
+        Debug.Log($"Undo move from server: {um.originalX} {um.originalY} -> {um.destinationX} {um.destinationY}");
+
+        UndoMove(um.originalX, um.originalY, um.destinationX, um.destinationY, capture, promotion, enPassant, castle, null, false);
+
+        deniedMove = true;
     }
 
     private void ShutDownRelay(){

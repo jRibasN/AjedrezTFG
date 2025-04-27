@@ -15,6 +15,7 @@ public class ChessBoard : MonoBehaviour
 {
     [Header("Art stuff")]
     [SerializeField] private Material tileMaterial;
+    [SerializeField] private GameObject fog;
     [SerializeField] private float tileSize = 0.6f;
     [SerializeField] private float yOffset = 0.37f;
     [SerializeField] private Vector3 boardCenter = Vector3.zero;
@@ -40,6 +41,7 @@ public class ChessBoard : MonoBehaviour
     private const int TILE_COUNT_X = 8;
     private const int TILE_COUNT_Y = 8;
     private GameObject[,] tiles;
+    private GameObject[,] fogTiles;
     private Camera currentCamera;
     private Vector2Int currentHover;
     private Vector3 bounds;
@@ -61,6 +63,7 @@ public class ChessBoard : MonoBehaviour
     private bool computerGame = false;
     private bool asyncGame = false;
     private bool denialGame = false;
+    private bool fogOfWar = false;
     private bool[] playerRematch = new bool[2];
     private  Vector2Int[] myAsyncMove = {new Vector2Int(-1, -1), new Vector2Int(-1, -1)};
     private  Vector2Int[] enemyAsyncMove = {new Vector2Int(-1, -1), new Vector2Int(-1, -1)};
@@ -243,7 +246,6 @@ public class ChessBoard : MonoBehaviour
         tileObject.AddComponent<MeshFilter>().mesh = mesh;
         tileObject.AddComponent<MeshRenderer>().material = tileMaterial;
 
-
         Vector3[] vertices = new Vector3[4];
         vertices[0] = new Vector3(x * tileSize, yOffset, y * tileSize) - bounds;
         vertices[1] = new Vector3(x * tileSize, yOffset, (y + 1) * tileSize) - bounds;
@@ -261,6 +263,17 @@ public class ChessBoard : MonoBehaviour
         tileObject.AddComponent<BoxCollider>();
 
         return tileObject;
+    }
+
+    private void GenerateFogOfWar(){
+        fogTiles = new GameObject[TILE_COUNT_X, TILE_COUNT_Y];
+        for (int x = 0; x < TILE_COUNT_X; x++){
+            for (int y = 0; y < TILE_COUNT_Y; y++){
+                fogTiles[x, y] = Instantiate(fog, transform);
+                fogTiles[x, y].transform.position = new Vector3(x * tileSize, yOffset, y * tileSize) - bounds + new Vector3(tileSize / 2, 0, tileSize / 2);
+                fogTiles[x, y].transform.localScale = new Vector3(tileSize, 0.2f, tileSize);
+            }
+        }
     }
 
     // Spawning of the pieces
@@ -368,7 +381,6 @@ public class ChessBoard : MonoBehaviour
             brm.wantRematch = 1;
             Client.Instance.SendToServer(brm);
         }
-
         else{
             NetRematch rm = new NetRematch();
             rm.teamId = currentTeam;
@@ -428,13 +440,17 @@ public class ChessBoard : MonoBehaviour
             currentTeam = (currentTeam == 0) ? 1 : 0;
             if(currentTeam == 0) GameUI.Instance.ChangeCamera(CameraAngle.whiteTeam);
             if(currentTeam == 1) GameUI.Instance.ChangeCamera(CameraAngle.blackTeam);
-        } 
+        }
+        if (fogOfWar) FogOfWarVisibility();
     }
     public void OnMenuButton(){
         NetRematch rm = new NetRematch();
         rm.teamId = currentTeam;
         rm.wantRematch = 0;
         Client.Instance.SendToServer(rm);
+        foreach (GameObject ft in fogTiles){
+            Destroy(ft);
+        }
 
         Invoke("ShutDownRelay", 0.1f);
 
@@ -560,6 +576,7 @@ public class ChessBoard : MonoBehaviour
     }
 
     private void PreventCheck(int team, ChessPiece cp, ref List<Vector2Int> availableMoves, ChessPiece[,] board = null){
+        if (fogOfWar) return;
         if (board == null) board = chessPieces;
 
         ChessPiece targetKing = null;
@@ -1213,6 +1230,7 @@ public class ChessBoard : MonoBehaviour
                     Checkmate(2);
                 }
             }
+            if (fogOfWar) FogOfWarVisibility();
         }
         
 
@@ -1608,18 +1626,69 @@ public class ChessBoard : MonoBehaviour
                 Debug.Log("Std game selected");
                 asyncGame = false;
                 denialGame = false;
+                fogOfWar = false;
                 break;
             case 1:
                 Debug.Log("Async game selected");
                 asyncGame = true;
                 denialGame = false;
+                fogOfWar = false;
                 break;
             case 2:
                 Debug.Log("Denial game selected");
                 //denialGame = true;
                 asyncGame = false;
                 denialGame = true;
+                fogOfWar = false;
                 break;
+            case 3:
+                Debug.Log("Fog of war selected");
+                asyncGame = false;
+                denialGame = false;
+                fogOfWar = true;
+                break;
+        }
+    }
+
+    public void FogOfWarVisibility(){
+        List<Vector2Int> teamMoves = new List<Vector2Int>();
+        for (int x = 0; x < TILE_COUNT_X; x++)
+        {
+            for (int y = 0; y < TILE_COUNT_Y; y++)
+            {
+                ChessPiece piece = chessPieces[x, y];
+                if (piece != null && piece.team == currentTeam)
+                {
+                    // Get all available moves for the enemy piece
+                    List<Vector2Int> pieceMoves = piece.GetAvailableMoves(chessPieces, TILE_COUNT_X, TILE_COUNT_Y, moveList);
+                    teamMoves.AddRange(pieceMoves);
+                }
+            }
+        }
+        for (int x = 0; x < TILE_COUNT_X; x++)
+        {
+            for (int y = 0; y < TILE_COUNT_Y; y++)
+            {
+                ChessPiece piece = chessPieces[x, y];
+                if (piece != null && piece.team != currentTeam)
+                {
+                    if(teamMoves.Contains(new Vector2Int(x, y))){
+                        piece.gameObject.SetActive(true);
+                    }
+                    else{
+                        piece.gameObject.SetActive(false);
+                    }
+                }
+                if (!teamMoves.Contains(new Vector2Int(x, y)))
+                {
+                    if(piece != null && piece.team == currentTeam) fogTiles[x, y].gameObject.SetActive(false);
+                    else fogTiles[x, y].SetActive(true);
+                }
+                else
+                {
+                    fogTiles[x, y].SetActive(false);
+                }   
+            }
         }
     }
 
@@ -1687,6 +1756,9 @@ public class ChessBoard : MonoBehaviour
         else if(denialGame){
             sg.gameMode = 2;
         }
+        else if(fogOfWar){
+            sg.gameMode = 3;
+        }
         else{
             sg.gameMode = 0;
         }
@@ -1738,18 +1810,29 @@ public class ChessBoard : MonoBehaviour
             // Local game
             asyncGame = false;
             denialGame = false;
+            fogOfWar = false;
         }
         else if(sg.gameMode == 1){
             // Asynchronous game
             asyncGame = true;
             denialGame = false;
+            fogOfWar = false;
         }
         else if(sg.gameMode == 2){
             // Denial game
             asyncGame = false;
             denialGame = true;
+            fogOfWar = false;
             denyMoveButton.gameObject.SetActive(true);
             denyMoveButton.interactable = false;
+        }
+        else if(sg.gameMode == 3){
+            // Fog of war game
+            asyncGame = false;
+            denialGame = false;
+            fogOfWar = true;
+            GenerateFogOfWar();
+            FogOfWarVisibility();
         }
 
         // We just need to change the camera

@@ -27,6 +27,7 @@ public class ChessBoard : MonoBehaviour
     [Header("Prefabs & Materials")]
     [SerializeField] private GameObject[] prefabs;
     [SerializeField] private Material[] teamMaterials;
+    [SerializeField] private AudioClip[] sounds;
 
     //LOGIC
     private ChessPiece[,] chessPieces;
@@ -55,6 +56,7 @@ public class ChessBoard : MonoBehaviour
     private bool waitingAsyncMove = false;
     private Dictionary<string, float> transpositionTable = new Dictionary<string, float>();
     private List<Vector2Int[]> moveList = new List<Vector2Int[]>();
+    [SerializeField] private AudioSource audioSource;
 
     // Multiplayer logic
     private int playerCount = -1;
@@ -448,10 +450,12 @@ public class ChessBoard : MonoBehaviour
         rm.teamId = currentTeam;
         rm.wantRematch = 0;
         Client.Instance.SendToServer(rm);
-        foreach (GameObject ft in fogTiles){
-            Destroy(ft);
+        if(fogTiles != null){
+            foreach (GameObject ft in fogTiles){
+                Destroy(ft);
+            }
         }
-
+        
         Invoke("ShutDownRelay", 0.1f);
 
         Invoke("GameReset", 0.11f);
@@ -571,6 +575,7 @@ public class ChessBoard : MonoBehaviour
                     }
                 }
                 castle = true;
+                audioSource.clip = sounds[3];
             }
         }
     }
@@ -1136,6 +1141,8 @@ public class ChessBoard : MonoBehaviour
     {
         if (board == null) board = this.chessPieces;
 
+        audioSource.clip = sounds[0];
+
         if(asyncGame && myAsyncMove[1] == new Vector2Int(-1, -1)){
             waitingAsyncMove = true;
             myAsyncMove[0].x = originalX;
@@ -1164,6 +1171,7 @@ public class ChessBoard : MonoBehaviour
             ChessPiece otherCp = board[x, y];
 
             if (cp.team == otherCp.team) return;
+            audioSource.clip = sounds[2];
 
             // If it's from the enemy team
             if (otherCp.team == 0)
@@ -1212,36 +1220,64 @@ public class ChessBoard : MonoBehaviour
 
         RemoveHighlightTiles();
 
+        if (!simMode){
+            // Check if we are checking the enemy king
+            List<Vector2Int> moves = cp.GetAvailableMoves(chessPieces, TILE_COUNT_X, TILE_COUNT_Y, moveList);
+            ChessPiece targetKing = null;
+            for (int i = 0; i < TILE_COUNT_X; i++)
+                for (int j = 0; j < TILE_COUNT_Y; j++)
+                    if (board[i, j] != null)
+                        if (board[i, j].type == ChessPieceType.King)
+                            if (board[i, j].team != cp.team)
+                                targetKing = board[i, j];
+            if (targetKing != null){
+                if(ContainsValidMove(ref moves, new Vector2Int(targetKing.currentX, targetKing.currentY))){
+                    audioSource.clip = sounds[1];
+                }
+            }
+            else{
+                audioSource.clip = sounds[0];
+            }
+        }
+        
+
         if(!asyncGame){
             if (CheckForCheckmate() && !simMode){
                 if(!denialGame){
                     Checkmate(winnerTeam);
+                    audioSource.clip = sounds[4];
                 }
                 else if(denialGame && deniedMove){
                     Checkmate(winnerTeam);
+                    audioSource.clip = sounds[4];
                 }
             }
                 
             if (CheckForStalemate() && !simMode){
                 if(!denialGame){
                     Checkmate(2);
+                    audioSource.clip = sounds[4];
                 }
                 else if(denialGame && deniedMove){
                     Checkmate(2);
+                    audioSource.clip = sounds[4];
                 }
             }
             
             if(deniedMove) deniedMove = false;
 
             if (fogOfWar) FogOfWarVisibility();
-
         }
         
-
+        audioSource.Play();
         return;
     }
 
     private void UndoMove(int originalX, int originalY, int moveX, int moveY, bool captureInstance, bool promotionInstance, bool enPassantInstance, bool castleInstance, ChessPiece[,] board = null, bool simMode = true){
+        if (!simMode){
+            audioSource.clip = sounds[5];
+            audioSource.Play();
+        }
         if (board == null) board = this.chessPieces;
         //Debug.Log("Undoing move from " + moveX + ", " + moveY + " to " + originalX + ", " + originalY);
         ChessPiece cp = board[moveX, moveY];

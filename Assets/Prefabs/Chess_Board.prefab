@@ -90,9 +90,14 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   tileMaterial: {fileID: 2100000, guid: d1694b4a67c3d434f889a7888be16325, type: 2}
+  fog: {fileID: 2399879855583542399, guid: efa5c875cfded744aaa6d7c86d4ca982, type: 3}
   tileSize: 0.6
   yOffset: 0.37
   boardCenter: {x: 0, y: 0, z: 0}
+  victoryScreen: {fileID: 0}
+  rematchIndicator: {fileID: 0}
+  rematchButton: {fileID: 0}
+  denyMoveButton: {fileID: 0}
   prefabs:
   - {fileID: 6796050301841114146, guid: ad8a3339ab1f3864eaec6055be1fdb81, type: 3}
   - {fileID: 438446206463598584, guid: 2ee6a3e6a02a25843a4069e2e2017fc1, type: 3}

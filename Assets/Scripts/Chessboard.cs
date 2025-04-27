@@ -1230,7 +1230,11 @@ public class ChessBoard : MonoBehaviour
                     Checkmate(2);
                 }
             }
+            
+            if(deniedMove) deniedMove = false;
+
             if (fogOfWar) FogOfWarVisibility();
+
         }
         
 

@@ -5,6 +5,7 @@ using System.Data;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
+using TMPro;
 using Unity.Mathematics;
 using Unity.Networking.Transport;
 using UnityEngine;
@@ -57,6 +58,7 @@ public class ChessBoard : MonoBehaviour
     private Dictionary<string, float> transpositionTable = new Dictionary<string, float>();
     private List<Vector2Int[]> moveList = new List<Vector2Int[]>();
     [SerializeField] private AudioSource audioSource;
+    [SerializeField] private GameObject gameModeLabel;
 
     // Multiplayer logic
     private int playerCount = -1;
@@ -123,7 +125,7 @@ public class ChessBoard : MonoBehaviour
 
                         // Get a list of where I can go, highlight tiles as well
                         availableMoves = CurrentlyDragging.GetAvailableMoves(chessPieces, TILE_COUNT_X, TILE_COUNT_Y, moveList);
-                        if(denialGame && deniedMove){
+                        if(denialGame && deniedMove && denialMove[0].x == CurrentlyDragging.currentX && denialMove[0].y == CurrentlyDragging.currentY){
                             availableMoves.Remove(denialMove[1]);
                         }
                         // Get a list of special moves as well
@@ -713,18 +715,27 @@ public class ChessBoard : MonoBehaviour
             // Are we in check right now?
             if (targetKing != null){
                 if(ContainsValidMove(ref currentAvailableMoves, new Vector2Int(targetKing.currentX, targetKing.currentY))){
+                    int defensesCount = 0;
                     // King is under attack, can we move something to help him?
                     for (int i = 0; i < defendingPieces.Count; i++)
                     {
                         List<Vector2Int> defendingMoves = defendingPieces[i].GetAvailableMoves(board, TILE_COUNT_X, TILE_COUNT_Y, moveList);
                         SimulateMoveForSinglePiece(defendingPieces[i], defendingMoves, targetKing, board);
 
-                        if(defendingMoves.Count != 0)
-                            return false;
+                        if (defendingMoves.Count != 0)
+                        {
+                            if (defendingMoves.Count == 1 && denialMove[1] == defendingMoves[0]) defensesCount++;
+                            else return false;
+                        }
                     }
 
                     winnerTeam = targetTeam == 0 ? 1 : 0;
-                    return true; // Checkmate exit
+                    
+                    if (denialGame && defensesCount > 1)
+                    {
+                        return false;
+                    }
+                    else return true; // Checkmate exit
                 }
                 else{
                     List<Vector2Int> defendingMoves = new List<Vector2Int>();
@@ -1947,6 +1958,20 @@ public class ChessBoard : MonoBehaviour
 
         UndoMove(um.originalX, um.originalY, um.destinationX, um.destinationY, capture, promotion, enPassant, castle, null, false);
 
+        if(moveList.Count > 0)
+        {
+            if (CheckForCheckmate())
+            {
+                Checkmate(winnerTeam);
+                winnerTeam = -1;
+            }
+            if (CheckForOwnCheckmate())
+            {
+                Checkmate(winnerTeam);
+                winnerTeam = -1;
+            }
+        }
+
         deniedMove = true;
     }
 
@@ -1969,12 +1994,17 @@ public class ChessBoard : MonoBehaviour
         computerGame = ai;
     }
 
-    private void OnSetMenu(){
+    private void OnSetMenu()
+    {
         playerCount = -1;
         currentTeam = -1;
         localGame = false;
         computerGame = false;
-
+        asyncGame = false;
+        denialGame = false;
+        fogOfWar = false;
+        denyMoveButton.gameObject.SetActive(false);
+        gameModeLabel.GetComponent<TextMeshProUGUI>().text = "Standard Chess";
     }
     #endregion
 }

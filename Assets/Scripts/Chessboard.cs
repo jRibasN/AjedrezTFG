@@ -519,7 +519,8 @@ public class ChessBoard : MonoBehaviour
             if (myPawn.team == 0 && newMove[1].y == 7){
                 ChessPiece newQueen = SpawnSinglePiece(ChessPieceType.Queen, 0, 9);
                 newQueen.transform.position = board[newMove[1].x, newMove[1].y].transform.position;
-                if(simMode) promotedPawn.Push(board[newMove[1].x, newMove[1].y]);
+                if(simMode || denialGame) promotedPawn.Push(board[newMove[1].x, newMove[1].y]);
+                if(denialGame) board[newMove[1].x, newMove[1].y].gameObject.SetActive(false);
                 else Destroy(board[newMove[1].x, newMove[1].y].gameObject);
                 board[newMove[1].x, newMove[1].y] = newQueen;
                 PositionSinglePiece(newMove[1].x, newMove[1].y, simMode);
@@ -529,7 +530,8 @@ public class ChessBoard : MonoBehaviour
             if (myPawn.team == 1 && newMove[1].y == 0){
                 ChessPiece newQueen = SpawnSinglePiece(ChessPieceType.Queen, 1, 9);
                 newQueen.transform.position = board[newMove[1].x, newMove[1].y].transform.position;
-                if(simMode) promotedPawn.Push(board[newMove[1].x, newMove[1].y]);
+                if(simMode || denialGame) promotedPawn.Push(board[newMove[1].x, newMove[1].y]);
+                if(denialGame) board[newMove[1].x, newMove[1].y].gameObject.SetActive(false);
                 else Destroy(board[newMove[1].x, newMove[1].y].gameObject);
                 board[newMove[1].x, newMove[1].y] = newQueen;
                 PositionSinglePiece(newMove[1].x, newMove[1].y, simMode);
@@ -1273,7 +1275,9 @@ public class ChessBoard : MonoBehaviour
         return;
     }
 
-    private void UndoMove(int originalX, int originalY, int moveX, int moveY, bool captureInstance, bool promotionInstance, bool enPassantInstance, bool castleInstance, ChessPiece[,] board = null, bool simMode = true){
+    private void UndoMove(int originalX, int originalY, int moveX, int moveY,
+            bool captureInstance, bool promotionInstance, bool enPassantInstance,
+                bool castleInstance, ChessPiece[,] board = null, bool simMode = true){
         if (!simMode){
             audioSource.clip = sounds[5];
             audioSource.Play();
@@ -1339,6 +1343,7 @@ public class ChessBoard : MonoBehaviour
 
         if(promotionInstance){
             ChessPiece pawn = promotedPawn.Pop();
+            pawn.gameObject.SetActive(true);
             Destroy(cp.gameObject);
             board[originalX, originalY] = pawn;
         }

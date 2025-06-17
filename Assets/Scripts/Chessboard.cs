@@ -492,10 +492,10 @@ public class ChessBoard : MonoBehaviour
 
         Invoke("ShutDownRelay", 0.1f);
 
-        Invoke("GameReset", 0.11f);
-
         // Reset some values
-        Invoke("OnSetMenu", 0.12f);
+        Invoke("OnSetMenu", 0.11f);
+
+        Invoke("GameReset", 0.12f);
 
         GameUI.Instance.Invoke("OnLeaveFromGameMenu", 0.12f);
 

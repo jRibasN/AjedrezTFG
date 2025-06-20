@@ -126,9 +126,9 @@ public class King : ChessPiece
         }
 
         if(kingMove == null && currentX == 4){
-            // White team
+            //White team
             if(team == 0){
-                // Left Rook
+                //Left Rook
                 if (leftRook == null && board[0, 0] != null)
                     if(board[0, 0].type == ChessPieceType.Rook)
                         if(board[0, 0].team == 0)
@@ -142,7 +142,7 @@ public class King : ChessPiece
                                         }
                                     }
 
-                // Right Rook
+                //Right Rook
                 if (rightRook == null && board[7, 0] != null)
                     if(board[7, 0].type == ChessPieceType.Rook)
                         if(board[7, 0].team == 0)
@@ -157,7 +157,7 @@ public class King : ChessPiece
             }
 
             else{
-                // Left Rook
+                //Left Roook
                 if (leftRook == null && board[0, 7] != null)
                     if(board[0, 7].type == ChessPieceType.Rook)
                         if(board[0, 7].team == 1)
@@ -171,7 +171,7 @@ public class King : ChessPiece
                                         }
                                     }
 
-                // Right Rook
+                //Right Rook
                 if (rightRook == null && board[7, 7] != null)
                     if(board[7, 7].type == ChessPieceType.Rook)
                         if(board[7, 7].team == 1)

@@ -31,7 +31,7 @@ public class Rook : ChessPiece
     public override List<Vector2Int> GetAvailableMoves(ChessPiece[,] board, int tileCountX, int tileCountY, List<Vector2Int[]> moveList){
         List<Vector2Int> r = new List<Vector2Int>();
 
-        // Move up
+        //Move up
         for (int i = currentY; i < tileCountY - 1; i++)
         {
             if (board[currentX, i + 1] == null)
@@ -45,7 +45,7 @@ public class Rook : ChessPiece
             else break;
         }
 
-        // Move down
+        //Move down
         for (int i = currentY; i > 0; i--)
         {
             if (board[currentX, i - 1] == null)
@@ -59,7 +59,7 @@ public class Rook : ChessPiece
             else break;
         }
 
-        // Move right
+        //Move right
         for (int i = currentX; i < tileCountX - 1; i++)
         {
             if (board[i + 1, currentY] == null)
@@ -73,7 +73,7 @@ public class Rook : ChessPiece
             else break;
         }
 
-        // Move left
+        //Move left
         for (int i = currentX; i > 0; i--)
         {
             if (board[i - 1, currentY] == null)

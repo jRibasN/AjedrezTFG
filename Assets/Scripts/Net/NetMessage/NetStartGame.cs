@@ -20,11 +20,11 @@ public class NetStartGame : NetMessage
 
     public override void Serialize(ref DataStreamWriter writer){
         writer.WriteByte((byte)Code);
-        writer.WriteInt(gameMode); // Assuming gameMode is an enum or byte value
+        writer.WriteInt(gameMode);
     }
 
     public override void Deserialize(DataStreamReader reader){
-        gameMode = reader.ReadInt(); // Read the string but ignore it
+        gameMode = reader.ReadInt();
     }
 
     public override void ReceivedOnClient(){

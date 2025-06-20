@@ -35,7 +35,7 @@ public static class NetUtility
         else msg.ReceivedOnClient();
     }
 
-    // Net messages
+    //Net messages
     public static Action<NetMessage> C_KEEP_ALIVE;
     public static Action<NetMessage> C_WELCOME;
     public static Action<NetMessage> C_START_GAME;

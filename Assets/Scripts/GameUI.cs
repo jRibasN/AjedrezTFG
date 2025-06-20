@@ -29,7 +29,7 @@ public class GameUI : MonoBehaviour
         RegisterEvents();
     }
 
-    // Cameras
+    //Cameras
     public void ChangeCamera(CameraAngle index){
         for (int i = 0; i < cameraAngles.Length; i++)
             cameraAngles[i].SetActive(false);
@@ -37,7 +37,7 @@ public class GameUI : MonoBehaviour
         cameraAngles[(int)index].SetActive(true);
     }
 
-    // Buttons
+    //Buttons
     public void OnLocalGameButton(){
         menuAnimator.SetTrigger("InGameMenu");
         SetLocalGame?.Invoke(true);

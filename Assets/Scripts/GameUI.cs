@@ -15,7 +15,7 @@ public class GameUI : MonoBehaviour
     public Server server;
     public Client client;
 
-    [SerializeField] private Animator menuAnimator;
+    [SerializeField] public Animator menuAnimator;
     [SerializeField] private TMP_InputField adressInput;
     [SerializeField] private GameObject[] cameraAngles;
 
@@ -29,7 +29,7 @@ public class GameUI : MonoBehaviour
         RegisterEvents();
     }
 
-    // Cameras
+    //Cameras
     public void ChangeCamera(CameraAngle index){
         for (int i = 0; i < cameraAngles.Length; i++)
             cameraAngles[i].SetActive(false);
@@ -37,7 +37,7 @@ public class GameUI : MonoBehaviour
         cameraAngles[(int)index].SetActive(true);
     }
 
-    // Buttons
+    //Buttons
     public void OnLocalGameButton(){
         menuAnimator.SetTrigger("InGameMenu");
         SetLocalGame?.Invoke(true);
@@ -88,7 +88,8 @@ public class GameUI : MonoBehaviour
     }
 
     #region
-    private void RegisterEvents(){
+    private void RegisterEvents()
+    {
         NetUtility.C_START_GAME += OnStartGameClient;
     }
 

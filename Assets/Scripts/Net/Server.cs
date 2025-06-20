@@ -24,7 +24,7 @@ public class Server : MonoBehaviour
 
     public Action connectionDropped;
 
-    // Methods
+    //Methods
     public void Init(ushort port){
         driver = NetworkDriver.Create();
         NetworkEndpoint endpoint = NetworkEndpoint.AnyIpv4;

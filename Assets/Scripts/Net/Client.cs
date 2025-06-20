@@ -21,7 +21,7 @@ public class Client : MonoBehaviour
 
     public Action connectionDropped;
 
-    // Methods
+    //Methods
     public void Init(string ip, ushort port){
         driver = NetworkDriver.Create();
         NetworkEndpoint endpoint = NetworkEndpoint.Parse(ip, port);
@@ -95,7 +95,6 @@ public class Client : MonoBehaviour
         driver.EndSend(writer);
     }
 
-    // Event parsing
     private void RegisterToEvent(){
         NetUtility.C_KEEP_ALIVE += OnKeepAlive;
     }
@@ -105,7 +104,6 @@ public class Client : MonoBehaviour
     }
 
     private void OnKeepAlive(NetMessage nm){
-        // Send it back, to keep both side alive
         SendToServer(nm);
     }
 }

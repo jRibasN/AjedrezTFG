@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using Unity.Collections;
@@ -6,6 +7,7 @@ using UnityEngine;
 
 public class NetStartGame : NetMessage
 {
+    public int gameMode;
 
     public NetStartGame(){
         Code = OpCode.START_GAME;
@@ -18,9 +20,11 @@ public class NetStartGame : NetMessage
 
     public override void Serialize(ref DataStreamWriter writer){
         writer.WriteByte((byte)Code);
+        writer.WriteInt(gameMode);
     }
 
     public override void Deserialize(DataStreamReader reader){
+        gameMode = reader.ReadInt();
     }
 
     public override void ReceivedOnClient(){
